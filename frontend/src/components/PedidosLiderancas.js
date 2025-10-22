@@ -403,30 +403,59 @@ export default function PedidosLiderancas() {
     }
   };
 
-  // Filtrar pedidos pela busca
-  const pedidosFiltrados = pedidos.filter(pedido => {
-    // Filtro de busca geral
-    let matchBusca = true;
-    if (busca) {
-      const buscaNormalizada = normalizeText(busca);
-      matchBusca = (
-        normalizeText(pedido.protocolo || '').includes(buscaNormalizada) ||
-        normalizeText(pedido.pedido_titulo || '').includes(buscaNormalizada) ||
-        normalizeText(pedido.nome_lideranca || '').includes(buscaNormalizada) ||
-        normalizeText(pedido.numero_lideranca || '').includes(buscaNormalizada) ||
-        normalizeText(pedido.municipio_nome || '').includes(buscaNormalizada) ||
-        normalizeText(pedido.descricao || '').includes(buscaNormalizada)
-      );
+  // Filtrar pedidos pela busca com tratamento de erro robusto
+  const pedidosFiltrados = React.useMemo(() => {
+    try {
+      // Garantir que pedidos é um array válido
+      if (!Array.isArray(pedidos)) {
+        console.warn('[pedidosFiltrados] pedidos não é um array:', pedidos);
+        return [];
+      }
+
+      return pedidos.filter(pedido => {
+        // Proteção contra pedidos inválidos
+        if (!pedido || typeof pedido !== 'object') {
+          console.warn('[pedidosFiltrados] Pedido inválido encontrado:', pedido);
+          return false;
+        }
+
+        // Filtro de busca geral
+        let matchBusca = true;
+        if (busca) {
+          try {
+            const buscaNormalizada = normalizeText(busca);
+            matchBusca = (
+              normalizeText(pedido.protocolo || '').includes(buscaNormalizada) ||
+              normalizeText(pedido.pedido_titulo || '').includes(buscaNormalizada) ||
+              normalizeText(pedido.nome_lideranca || '').includes(buscaNormalizada) ||
+              normalizeText(pedido.numero_lideranca || '').includes(buscaNormalizada) ||
+              normalizeText(pedido.municipio_nome || '').includes(buscaNormalizada) ||
+              normalizeText(pedido.descricao || '').includes(buscaNormalizada)
+            );
+          } catch (e) {
+            console.error('[pedidosFiltrados] Erro ao filtrar busca:', e);
+            return false;
+          }
+        }
+        
+        // Filtro por município
+        let matchMunicipio = true;
+        if (filtroMunicipio) {
+          try {
+            matchMunicipio = normalizeText(pedido.municipio_nome || '').includes(normalizeText(filtroMunicipio));
+          } catch (e) {
+            console.error('[pedidosFiltrados] Erro ao filtrar município:', e);
+            return false;
+          }
+        }
+        
+        return matchBusca && matchMunicipio;
+      });
+    } catch (error) {
+      console.error('[pedidosFiltrados] Erro crítico na filtragem:', error);
+      return [];
     }
-    
-    // Filtro por município
-    let matchMunicipio = true;
-    if (filtroMunicipio) {
-      matchMunicipio = normalizeText(pedido.municipio_nome || '').includes(normalizeText(filtroMunicipio));
-    }
-    
-    return matchBusca && matchMunicipio;
-  });
+  }, [pedidos, busca, filtroMunicipio]);
 
   // Filtrar municípios para o autocomplete (usando versão debounced)
   const municipiosFiltrados = municipios.filter(municipio => {
