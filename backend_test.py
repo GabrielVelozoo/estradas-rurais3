@@ -2197,7 +2197,7 @@ class LiderancasV2Tester:
             if response.status_code == 201:
                 data = response.json()
                 if (data.get("municipio_nome") == pedido_data["municipio_nome"] and 
-                    data.get("lideranca_nome") == pedido_data["lideranca_nome"] and
+                    data.get("nome_lideranca") == pedido_data["nome_lideranca"] and
                     data.get("id")):
                     self.created_pedido_ids.append(data.get("id"))
                     self.log_test(
