@@ -196,6 +196,7 @@ export default function PedidosLiderancas() {
   const fetchMunicipios = async () => {
     setMunicipiosCarregando(true);
     try {
+      console.log('[fetchMunicipios] Iniciando requisição...');
       const response = await fetch(`${BACKEND_URL}/api/municipios`, {
         credentials: 'include',
         headers: {
@@ -203,14 +204,30 @@ export default function PedidosLiderancas() {
         }
       });
 
+      console.log('[fetchMunicipios] Status:', response.status);
+
+      // Tratamento específico para erro de autenticação
+      if (response.status === 401) {
+        console.warn('[fetchMunicipios] Não autorizado (401)');
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(`Erro ao carregar municípios: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('[fetchMunicipios] Municípios carregados:', data.length);
+      
+      // Validar que os dados são um array
+      if (!Array.isArray(data)) {
+        console.error('[fetchMunicipios] Dados recebidos não são um array');
+        return;
+      }
+      
       setMunicipios(data);
     } catch (error) {
-      console.error('Erro ao carregar municípios:', error);
+      console.error('[fetchMunicipios] Erro:', error);
     } finally {
       setMunicipiosCarregando(false);
     }
