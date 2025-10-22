@@ -42,9 +42,19 @@ function App() {
               } 
             />
 
-            {/* Página de Pedidos de Maquinários */}
+            {/* Página de Pedidos de Maquinários V2 (Nova versão) */}
             <Route 
               path="/pedidos-maquinarios" 
+              element={
+                <ProtectedRoute>
+                  <PedidosMaquinariosV2 />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* Página antiga de Pedidos de Maquinários (manter por enquanto) */}
+            <Route 
+              path="/pedidos-maquinarios-old" 
               element={
                 <ProtectedRoute>
                   <PedidosMaquinarios />
