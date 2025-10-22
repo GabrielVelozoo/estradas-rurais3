@@ -2239,15 +2239,15 @@ class LiderancasV2Tester:
             return False
             
         try:
+            # NOTE: API is still expecting V1 field names despite V2 routes being active
             pedido_data = {
                 "municipio_id": "2",
                 "municipio_nome": "Londrina",
-                "lideranca_nome": "Maria Silva",
-                "titulo": "Reparo de Ponte",
+                "pedido_titulo": "Reparo de Ponte",
+                "nome_lideranca": "Maria Silva",
+                "numero_lideranca": "(41) 99999-8888",
                 "protocolo": "12.345.678-9",
-                "lideranca_telefone": "(41) 99999-8888",
-                "descricao": "Necessário reparo urgente",
-                "status": "em_andamento"
+                "descricao": "Necessário reparo urgente"
             }
             
             response = self.session.post(
