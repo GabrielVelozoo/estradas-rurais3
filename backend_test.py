@@ -1768,8 +1768,7 @@ class LiderancasOptionalFieldsTester:
                 "titulo": "",
                 "protocolo": "",
                 "lideranca_telefone": "",
-                "descricao": "",
-                "status": None
+                "descricao": ""
             }
             
             response = self.session.post(
