@@ -679,7 +679,224 @@ export default function PedidosMaquinariosV2() {
         </div>
       </div>
 
-      {/* Modal - continua na próxima parte */}
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold mb-6 text-gray-900">
+                {editingId ? 'Editar Pedido' : 'Adicionar Pedido'}
+              </h2>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Município */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Município <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.municipio_id}
+                    onChange={(e) => {
+                      const mun = municipios.find(m => m.id === e.target.value);
+                      setFormData({
+                        ...formData,
+                        municipio_id: e.target.value,
+                        municipio_nome: mun ? mun.nome : ''
+                      });
+                    }}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">Selecione um município</option>
+                    {municipios.map(m => (
+                      <option key={m.id} value={m.id}>{m.nome}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Liderança (opcional) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Liderança Responsável (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.lideranca_nome}
+                    onChange={(e) => setFormData({ ...formData, lideranca_nome: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    placeholder="Ex: João da Silva"
+                  />
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status (opcional)
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">Selecione um status</option>
+                    {STATUS_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Seção de Itens */}
+                <div className="border-t pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Itens do Pedido <span className="text-red-500">*</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
+                    >
+                      + Adicionar Item
+                    </button>
+                  </div>
+
+                  {formData.itens.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                      Nenhum item adicionado. Clique em "Adicionar Item" para começar.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {formData.itens.map((item, index) => (
+                        <div key={index} className="border rounded-lg p-4 bg-gray-50 relative">
+                          {/* Botão remover */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(index)}
+                            className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+                            title="Remover item"
+                          >
+                            ❌
+                          </button>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Equipamento */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Equipamento <span className="text-red-500">*</span>
+                              </label>
+                              <select
+                                value={item.equipamento}
+                                onChange={(e) => handleUpdateItem(index, 'equipamento', e.target.value)}
+                                required
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
+                              >
+                                <option value="">Selecione um equipamento</option>
+                                {catalogoEquipamentos.map(eq => (
+                                  <option key={eq.nome} value={eq.nome}>
+                                    {eq.nome} - {formatCurrency(eq.preco)}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Quantidade */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Quantidade <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantidade}
+                                onChange={(e) => handleUpdateItem(index, 'quantidade', e.target.value)}
+                                required
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
+                              />
+                            </div>
+
+                            {/* Preço Unitário (read-only) */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Preço Unitário (automático)
+                              </label>
+                              <input
+                                type="text"
+                                value={formatCurrency(item.preco_unitario)}
+                                readOnly
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm text-gray-600"
+                              />
+                            </div>
+
+                            {/* Subtotal (calculado) */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Subtotal (automático)
+                              </label>
+                              <input
+                                type="text"
+                                value={formatCurrency(item.subtotal)}
+                                readOnly
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-green-50 text-sm font-semibold text-green-700"
+                              />
+                            </div>
+
+                            {/* Observação */}
+                            <div className="md:col-span-2">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Observação (opcional)
+                              </label>
+                              <input
+                                type="text"
+                                value={item.observacao}
+                                onChange={(e) => handleUpdateItem(index, 'observacao', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
+                                placeholder="Ex: Com pneus novos"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Total do Pedido */}
+                  {formData.itens.length > 0 && (
+                    <div className="mt-6 pt-4 border-t">
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-semibold text-gray-900">
+                          Total do Pedido:
+                        </span>
+                        <span className="text-2xl font-bold text-green-700">
+                          {formatCurrency(formData.valor_total)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Botões */}
+                <div className="flex gap-3 justify-end mt-6 pt-6 border-t">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    disabled={submitting}
+                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    {submitting ? 'Salvando...' : (editingId ? 'Atualizar' : 'Criar')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
