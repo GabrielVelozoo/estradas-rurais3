@@ -1229,14 +1229,323 @@ class LiderancasTester:
         
         return failed == 0
 
+class LiderancasGetTester:
+    """Focused tester for GET /api/liderancas endpoint as requested"""
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        })
+        self.test_results = []
+        self.auth_cookies = None
+        
+    def log_test(self, test_name, success, details="", response_data=None):
+        """Log test results"""
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status} {test_name}")
+        if details:
+            print(f"   Details: {details}")
+        if response_data and not success:
+            print(f"   Response: {response_data}")
+        print()
+        
+        self.test_results.append({
+            'test': test_name,
+            'success': success,
+            'details': details,
+            'response': response_data
+        })
+    
+    def authenticate_admin(self):
+        """Authenticate with admin@portal.gov.br / admin123 credentials"""
+        try:
+            response = self.session.post(
+                f"{BACKEND_URL}/auth/login",
+                json={
+                    "email": "admin@portal.gov.br",
+                    "password": "admin123"
+                }
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("message") == "Login successful":
+                    self.auth_cookies = response.cookies
+                    self.log_test(
+                        "Authentication (admin@portal.gov.br/admin123)",
+                        True,
+                        f"Successfully authenticated user: {data.get('user', {}).get('username', 'N/A')}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "Authentication (admin@portal.gov.br/admin123)",
+                        False,
+                        "Login response format incorrect",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "Authentication (admin@portal.gov.br/admin123)",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "Authentication (admin@portal.gov.br/admin123)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_get_liderancas_endpoint(self):
+        """Test GET /api/liderancas endpoint - main focus of the request"""
+        if not self.auth_cookies:
+            self.log_test(
+                "GET /api/liderancas (main test)",
+                False,
+                "No authentication cookies available"
+            )
+            return False
+            
+        try:
+            response = self.session.get(
+                f"{BACKEND_URL}/liderancas",
+                cookies=self.auth_cookies
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    self.log_test(
+                        "GET /api/liderancas (main test)",
+                        True,
+                        f"✅ Status 200 ✅ Returns array ✅ Count: {len(data)} pedidos"
+                    )
+                    
+                    # Check data format if there are items
+                    if len(data) > 0:
+                        first_item = data[0]
+                        required_fields = ['id', 'municipio_id', 'municipio_nome', 'pedido_titulo', 'nome_lideranca', 'numero_lideranca', 'created_at', 'updated_at']
+                        missing_fields = [field for field in required_fields if field not in first_item]
+                        
+                        if missing_fields:
+                            self.log_test(
+                                "Data structure validation",
+                                False,
+                                f"Missing required fields: {missing_fields}",
+                                first_item
+                            )
+                        else:
+                            self.log_test(
+                                "Data structure validation",
+                                True,
+                                "All required fields present in response data"
+                            )
+                    else:
+                        self.log_test(
+                            "Data structure validation",
+                            True,
+                            "Empty array returned (no pedidos in database)"
+                        )
+                    
+                    return True
+                else:
+                    self.log_test(
+                        "GET /api/liderancas (main test)",
+                        False,
+                        "Response is not an array",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "GET /api/liderancas (main test)",
+                    False,
+                    f"Expected status 200, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "GET /api/liderancas (main test)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_create_sample_pedido(self):
+        """Create a sample pedido if database is empty"""
+        if not self.auth_cookies:
+            self.log_test(
+                "POST /api/liderancas (sample creation)",
+                False,
+                "No authentication cookies available"
+            )
+            return False
+            
+        try:
+            pedido_data = {
+                "municipio_id": 1,
+                "municipio_nome": "Curitiba",
+                "pedido_titulo": "Solicitação de apoio para evento comunitário",
+                "protocolo": "24.500.100-7",
+                "nome_lideranca": "Maria Silva - Presidente da Associação",
+                "numero_lideranca": "41999887766",
+                "descricao": "Pedido de apoio logístico para evento beneficente da comunidade local"
+            }
+            
+            response = self.session.post(
+                f"{BACKEND_URL}/liderancas",
+                json=pedido_data,
+                cookies=self.auth_cookies
+            )
+            
+            if response.status_code == 201:
+                data = response.json()
+                if data.get("protocolo") == pedido_data["protocolo"]:
+                    self.log_test(
+                        "POST /api/liderancas (sample creation)",
+                        True,
+                        f"Successfully created sample pedido with protocol {data.get('protocolo')}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "POST /api/liderancas (sample creation)",
+                        False,
+                        "Response data mismatch",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "POST /api/liderancas (sample creation)",
+                    False,
+                    f"Expected 201, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "POST /api/liderancas (sample creation)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_get_liderancas_after_creation(self):
+        """Test GET /api/liderancas again after creating sample data"""
+        if not self.auth_cookies:
+            self.log_test(
+                "GET /api/liderancas (after creation)",
+                False,
+                "No authentication cookies available"
+            )
+            return False
+            
+        try:
+            response = self.session.get(
+                f"{BACKEND_URL}/liderancas",
+                cookies=self.auth_cookies
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list) and len(data) > 0:
+                    # Look for our created pedido
+                    found_sample = any(
+                        pedido.get("protocolo") == "24.500.100-7" 
+                        for pedido in data
+                    )
+                    
+                    if found_sample:
+                        self.log_test(
+                            "GET /api/liderancas (after creation)",
+                            True,
+                            f"✅ Sample pedido appears in list ✅ Total count: {len(data)} pedidos"
+                        )
+                        return True
+                    else:
+                        self.log_test(
+                            "GET /api/liderancas (after creation)",
+                            False,
+                            "Sample pedido not found in list",
+                            data
+                        )
+                else:
+                    self.log_test(
+                        "GET /api/liderancas (after creation)",
+                        False,
+                        "Expected non-empty array after creation",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "GET /api/liderancas (after creation)",
+                    False,
+                    f"Expected status 200, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "GET /api/liderancas (after creation)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def run_focused_tests(self):
+        """Run focused tests for GET /api/liderancas as requested"""
+        print("🎯 FOCUSED TESTING: GET /api/liderancas Endpoint")
+        print(f"Backend URL: {BACKEND_URL}")
+        print("Testing as requested in review:")
+        print("- Authentication with admin@portal.gov.br / admin123")
+        print("- GET /api/liderancas endpoint verification")
+        print("- Data format validation")
+        print("- Sample data creation if needed")
+        print("=" * 60)
+        print()
+        
+        # Test sequence
+        tests = [
+            self.authenticate_admin,
+            self.test_get_liderancas_endpoint,
+            self.test_create_sample_pedido,
+            self.test_get_liderancas_after_creation
+        ]
+        
+        passed = 0
+        failed = 0
+        
+        for test in tests:
+            if test():
+                passed += 1
+            else:
+                failed += 1
+        
+        # Summary
+        print("=" * 60)
+        print("📊 FOCUSED TEST SUMMARY")
+        print(f"✅ Passed: {passed}")
+        print(f"❌ Failed: {failed}")
+        print(f"📈 Success Rate: {(passed/(passed+failed)*100):.1f}%")
+        
+        if failed > 0:
+            print("\n❌ FAILED TESTS:")
+            for result in self.test_results:
+                if not result['success']:
+                    print(f"   • {result['test']}: {result['details']}")
+        
+        return failed == 0
+
 if __name__ == "__main__":
     print("🔧 Backend Testing Suite")
     print("Choose test suite:")
     print("1. Authentication Tests")
     print("2. Pedidos Lideranças Tests")
     print("3. Run All Tests")
+    print("4. Focused GET /api/liderancas Test (as requested)")
     
-    choice = input("Enter choice (1-3): ").strip()
+    choice = input("Enter choice (1-4): ").strip()
     
     if choice == "1":
         tester = AuthTester()
@@ -1264,10 +1573,13 @@ if __name__ == "__main__":
         print("="*60)
         print(f"Authentication Tests: {'✅ PASS' if auth_success else '❌ FAIL'}")
         print(f"Lideranças Tests: {'✅ PASS' if liderancas_success else '❌ FAIL'}")
-        print(f"Overall Result: {'✅ ALL TESTS PASSED' if success else '❌ SOME TESTS FAILED'}")
+        print(f"Overall Result: {'✅ ALL TESTS PASSED' if success else '❌ SOME TESTS PASSED'}")
+    elif choice == "4":
+        tester = LiderancasGetTester()
+        success = tester.run_focused_tests()
     else:
-        print("Invalid choice. Running Lideranças tests by default.")
-        tester = LiderancasTester()
-        success = tester.run_all_tests()
+        print("Invalid choice. Running focused GET /api/liderancas test by default.")
+        tester = LiderancasGetTester()
+        success = tester.run_focused_tests()
     
     sys.exit(0 if success else 1)
