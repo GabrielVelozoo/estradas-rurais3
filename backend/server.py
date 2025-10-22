@@ -16,6 +16,9 @@ from pedidos_routes import router as pedidos_router
 from liderancas_routes import router as liderancas_router
 from maquinarios_routes import router as maquinarios_router
 from municipios_routes import router as municipios_router
+# Import V2 modules
+from liderancas_v2_routes import router as liderancas_v2_router
+from maquinarios_v2_routes import router as maquinarios_v2_router
 from auth_middleware import get_current_active_user
 from auth_models import User
 from auth_utils import hash_password, prepare_user_for_mongo
