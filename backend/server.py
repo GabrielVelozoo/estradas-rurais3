@@ -88,9 +88,17 @@ app.include_router(maquinarios_router, prefix="/api")
 app.include_router(municipios_router, prefix="/api")
 
 # ---------- CORS CONFIGURADO ----------
+# Configuração de CORS para produção e desenvolvimento
 raw_origins = os.environ.get("CORS_ORIGINS", "*")
 origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+
+# Se temos origens específicas, habilitar credentials
 allow_credentials = not (len(origins) == 1 and origins[0] == "*")
+
+# Log das origens configuradas para debug
+logger = logging.getLogger(__name__)
+logger.info(f"CORS configurado com origens: {origins}")
+logger.info(f"CORS allow_credentials: {allow_credentials}")
 
 app.add_middleware(
     CORSMiddleware,
