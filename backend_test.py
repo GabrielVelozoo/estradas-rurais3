@@ -1945,24 +1945,24 @@ class LiderancasOptionalFieldsTester:
             {
                 "name": "Empty strings",
                 "data": {
-                    "municipio_id": 3,
+                    "municipio_id": "PR003",
                     "municipio_nome": "Maringá",
-                    "pedido_titulo": "Teste Vazio",
-                    "nome_lideranca": "Teste Vazio",
-                    "numero_lideranca": "41999887766",
+                    "lideranca_nome": "Teste Vazio",
+                    "titulo": "",
                     "protocolo": "",
+                    "lideranca_telefone": "",
                     "descricao": ""
                 }
             },
             {
                 "name": "Null values",
                 "data": {
-                    "municipio_id": 4,
+                    "municipio_id": "PR004",
                     "municipio_nome": "Cascavel",
-                    "pedido_titulo": "Teste Null",
-                    "nome_lideranca": "Teste Null",
-                    "numero_lideranca": "41999887766",
+                    "lideranca_nome": "Teste Null",
+                    "titulo": None,
                     "protocolo": None,
+                    "lideranca_telefone": None,
                     "descricao": None
                 }
             }
