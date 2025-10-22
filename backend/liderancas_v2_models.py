@@ -50,9 +50,11 @@ class PedidoLiderancaV2Base(BaseModel):
         # Remove tudo que não é dígito
         digits = re.sub(r'\D', '', v)
         
-        # Se tiver dígitos, deve ter 10 ou 11 (com DDD)
+        # Validação suave: aceita qualquer quantidade de dígitos
+        # Ideal seria 10 ou 11, mas não bloqueia
         if digits and len(digits) not in [10, 11]:
-            raise ValueError(f"Telefone deve ter 10 ou 11 dígitos (formato: (00) 00000-0000)")
+            # Não bloquear, apenas aceitar
+            pass
         
         return v.strip()
 
