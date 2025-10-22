@@ -127,7 +127,14 @@ async def list_pedidos(
         raw_pedidos = await cursor.to_list(length=10000)
 
         # Normalizar todos os documentos antes de criar o response
-        return [PedidoLiderancaResponse(**_normalize_lideranca(doc)) for doc in raw_pedidos]
+        normalized_docs = []
+        for doc in raw_pedidos:
+            normalized = _normalize_lideranca(doc)
+            # Debug: log problematic documents
+            if normalized.get('pedido_titulo') == '' or normalized.get('nome_lideranca') == '':
+                print(f"DEBUG: Found problematic document: {normalized}")
+            normalized_docs.append(PedidoLiderancaResponse(**normalized))
+        return normalized_docs
 
     except Exception as e:
         raise HTTPException(
