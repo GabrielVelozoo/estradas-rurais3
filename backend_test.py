@@ -2561,9 +2561,12 @@ if __name__ == "__main__":
     elif choice == "5":
         tester = LiderancasOptionalFieldsTester()
         success = tester.run_optional_fields_tests()
+    elif choice == "6":
+        tester = LiderancasV2Tester()
+        success = tester.run_v2_tests()
     else:
-        print("Invalid choice. Running optional fields test by default.")
-        tester = LiderancasOptionalFieldsTester()
-        success = tester.run_optional_fields_tests()
+        print("Invalid choice. Running Lideranças V2 test by default.")
+        tester = LiderancasV2Tester()
+        success = tester.run_v2_tests()
     
     sys.exit(0 if success else 1)
