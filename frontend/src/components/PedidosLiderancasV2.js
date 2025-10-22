@@ -249,8 +249,25 @@ export default function PedidosLiderancasV2() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail?.error || errorData.detail || 'Erro ao salvar');
+        let errorMessage = 'Erro ao salvar pedido';
+        try {
+          const errorData = await response.json();
+          console.error('Erro do backend:', errorData);
+          
+          // Tentar extrair mensagem de erro de diferentes formatos
+          if (typeof errorData.detail === 'string') {
+            errorMessage = errorData.detail;
+          } else if (errorData.detail?.error) {
+            errorMessage = errorData.detail.error;
+          } else if (errorData.detail && typeof errorData.detail === 'object') {
+            errorMessage = JSON.stringify(errorData.detail);
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch (e) {
+          errorMessage = `Erro ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
 
       await fetchPedidos();
@@ -258,7 +275,7 @@ export default function PedidosLiderancasV2() {
       alert(editingId ? 'Pedido atualizado com sucesso!' : 'Pedido criado com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar:', error);
-      alert(error.message);
+      alert(error.message || 'Erro desconhecido ao salvar pedido');
     } finally {
       setSubmitting(false);
     }
