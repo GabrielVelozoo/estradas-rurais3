@@ -1827,8 +1827,7 @@ class LiderancasOptionalFieldsTester:
                 "titulo": "Teste",
                 "protocolo": "12.345",
                 "lideranca_telefone": "(41) 9",
-                "descricao": "Teste",
-                "status": "em_andamento"
+                "descricao": "Teste"
             }
             
             response = self.session.post(
