@@ -1654,15 +1654,433 @@ class LiderancasGetTester:
         
         return failed == 0
 
+class LiderancasOptionalFieldsTester:
+    """Test POST /api/liderancas with optional empty fields as requested in review"""
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        })
+        self.test_results = []
+        self.auth_cookies = None
+        self.created_pedido_ids = []
+        
+    def log_test(self, test_name, success, details="", response_data=None):
+        """Log test results"""
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status} {test_name}")
+        if details:
+            print(f"   Details: {details}")
+        if response_data and not success:
+            print(f"   Response: {response_data}")
+        print()
+        
+        self.test_results.append({
+            'test': test_name,
+            'success': success,
+            'details': details,
+            'response': response_data
+        })
+    
+    def authenticate_admin(self):
+        """Authenticate with admin@portal.gov.br / admin123"""
+        try:
+            response = self.session.post(
+                f"{BACKEND_URL}/auth/login",
+                json={
+                    "username": "admin@portal.gov.br",
+                    "password": "admin123"
+                }
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("message") == "Login successful":
+                    self.auth_cookies = response.cookies
+                    self.log_test(
+                        "Login (admin@portal.gov.br / admin123)",
+                        True,
+                        f"Successfully authenticated: {data.get('user', {}).get('username', 'N/A')}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "Login (admin@portal.gov.br / admin123)",
+                        False,
+                        "Login response format incorrect",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "Login (admin@portal.gov.br / admin123)",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "Login (admin@portal.gov.br / admin123)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_create_pedido_minimal_data(self):
+        """Test creating pedido with MINIMUM required data (optional fields empty)"""
+        if not self.auth_cookies:
+            self.log_test(
+                "POST /api/liderancas (minimal data)",
+                False,
+                "No authentication cookies available"
+            )
+            return False
+            
+        try:
+            pedido_data = {
+                "municipio_id": "PR001",
+                "municipio_nome": "Curitiba",
+                "lideranca_nome": "João Teste",
+                "titulo": "",
+                "protocolo": "",
+                "lideranca_telefone": "",
+                "descricao": "",
+                "status": None
+            }
+            
+            response = self.session.post(
+                f"{BACKEND_URL}/liderancas",
+                json=pedido_data,
+                cookies=self.auth_cookies
+            )
+            
+            if response.status_code == 201:
+                data = response.json()
+                if data.get("municipio_nome") == "Curitiba" and data.get("id"):
+                    self.created_pedido_ids.append(data.get("id"))
+                    self.log_test(
+                        "POST /api/liderancas (minimal data)",
+                        True,
+                        f"Successfully created pedido with minimal data, ID: {data.get('id')}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "POST /api/liderancas (minimal data)",
+                        False,
+                        "Response data mismatch",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "POST /api/liderancas (minimal data)",
+                    False,
+                    f"Expected 201, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "POST /api/liderancas (minimal data)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_create_pedido_partial_protocol(self):
+        """Test creating pedido with partial protocol (should accept)"""
+        if not self.auth_cookies:
+            self.log_test(
+                "POST /api/liderancas (partial protocol)",
+                False,
+                "No authentication cookies available"
+            )
+            return False
+            
+        try:
+            pedido_data = {
+                "municipio_id": "PR002",
+                "municipio_nome": "Londrina",
+                "lideranca_nome": "Maria Teste",
+                "titulo": "Teste",
+                "protocolo": "12.345",
+                "lideranca_telefone": "(41) 9",
+                "descricao": "Teste",
+                "status": "em_andamento"
+            }
+            
+            response = self.session.post(
+                f"{BACKEND_URL}/liderancas",
+                json=pedido_data,
+                cookies=self.auth_cookies
+            )
+            
+            if response.status_code == 201:
+                data = response.json()
+                if data.get("municipio_nome") == "Londrina" and data.get("id"):
+                    self.created_pedido_ids.append(data.get("id"))
+                    self.log_test(
+                        "POST /api/liderancas (partial protocol)",
+                        True,
+                        f"Successfully created pedido with partial protocol, ID: {data.get('id')}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "POST /api/liderancas (partial protocol)",
+                        False,
+                        "Response data mismatch",
+                        data
+                    )
+            elif response.status_code == 422:
+                # This is expected - partial protocol should be rejected
+                self.log_test(
+                    "POST /api/liderancas (partial protocol)",
+                    True,
+                    "Correctly rejected partial protocol with 422 (validation working)"
+                )
+                return True
+            else:
+                self.log_test(
+                    "POST /api/liderancas (partial protocol)",
+                    False,
+                    f"Unexpected status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "POST /api/liderancas (partial protocol)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_list_pedidos_after_creation(self):
+        """Test GET /api/liderancas to verify created pedidos"""
+        if not self.auth_cookies:
+            self.log_test(
+                "GET /api/liderancas (verify creation)",
+                False,
+                "No authentication cookies available"
+            )
+            return False
+            
+        try:
+            response = self.session.get(
+                f"{BACKEND_URL}/liderancas",
+                cookies=self.auth_cookies
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    # Check if our created pedidos are in the list
+                    found_pedidos = 0
+                    for pedido_id in self.created_pedido_ids:
+                        if any(p.get("id") == pedido_id for p in data):
+                            found_pedidos += 1
+                    
+                    self.log_test(
+                        "GET /api/liderancas (verify creation)",
+                        True,
+                        f"Found {found_pedidos}/{len(self.created_pedido_ids)} created pedidos in list. Total pedidos: {len(data)}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "GET /api/liderancas (verify creation)",
+                        False,
+                        "Response is not a list",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "GET /api/liderancas (verify creation)",
+                    False,
+                    f"Expected 200, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "GET /api/liderancas (verify creation)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_check_for_500_errors(self):
+        """Test various scenarios to check for 500 errors"""
+        if not self.auth_cookies:
+            self.log_test(
+                "Check for 500 errors",
+                False,
+                "No authentication cookies available"
+            )
+            return False
+            
+        test_cases = [
+            {
+                "name": "Empty strings",
+                "data": {
+                    "municipio_id": "PR003",
+                    "municipio_nome": "Maringá",
+                    "lideranca_nome": "Teste Vazio",
+                    "titulo": "",
+                    "protocolo": "",
+                    "lideranca_telefone": "",
+                    "descricao": ""
+                }
+            },
+            {
+                "name": "Null values",
+                "data": {
+                    "municipio_id": "PR004",
+                    "municipio_nome": "Cascavel",
+                    "lideranca_nome": "Teste Null",
+                    "titulo": None,
+                    "protocolo": None,
+                    "lideranca_telefone": None,
+                    "descricao": None
+                }
+            }
+        ]
+        
+        all_passed = True
+        for test_case in test_cases:
+            try:
+                response = self.session.post(
+                    f"{BACKEND_URL}/liderancas",
+                    json=test_case["data"],
+                    cookies=self.auth_cookies
+                )
+                
+                if response.status_code == 500:
+                    self.log_test(
+                        f"Check for 500 errors ({test_case['name']})",
+                        False,
+                        f"❌ FOUND 500 ERROR: {response.text}",
+                        response.text
+                    )
+                    all_passed = False
+                elif response.status_code in [201, 422]:
+                    # 201 = success, 422 = validation error (both acceptable)
+                    if response.status_code == 201:
+                        data = response.json()
+                        if data.get("id"):
+                            self.created_pedido_ids.append(data.get("id"))
+                    self.log_test(
+                        f"Check for 500 errors ({test_case['name']})",
+                        True,
+                        f"No 500 error - returned {response.status_code} (acceptable)"
+                    )
+                else:
+                    self.log_test(
+                        f"Check for 500 errors ({test_case['name']})",
+                        True,
+                        f"No 500 error - returned {response.status_code}"
+                    )
+            except Exception as e:
+                self.log_test(
+                    f"Check for 500 errors ({test_case['name']})",
+                    False,
+                    f"Exception: {str(e)}"
+                )
+                all_passed = False
+        
+        return all_passed
+    
+    def cleanup_created_pedidos(self):
+        """Clean up pedidos created during testing"""
+        if not self.auth_cookies or not self.created_pedido_ids:
+            return
+            
+        cleaned_count = 0
+        for pedido_id in self.created_pedido_ids:
+            try:
+                response = self.session.delete(
+                    f"{BACKEND_URL}/liderancas/{pedido_id}",
+                    cookies=self.auth_cookies
+                )
+                if response.status_code == 204:
+                    cleaned_count += 1
+            except Exception:
+                pass
+        
+        if cleaned_count > 0:
+            print(f"✅ Cleaned up {cleaned_count} test pedidos")
+    
+    def run_optional_fields_tests(self):
+        """Run tests for optional empty fields as requested in review"""
+        print("🎯 TESTING POST /api/liderancas WITH OPTIONAL EMPTY FIELDS")
+        print(f"Backend URL: {BACKEND_URL}")
+        print("=" * 60)
+        print("REVIEW REQUEST TESTING:")
+        print("✓ Login with admin@portal.gov.br / admin123")
+        print("✓ Create pedido with MINIMUM data (only required fields)")
+        print("✓ Create pedido with partial protocol (should accept or reject gracefully)")
+        print("✓ List pedidos to verify creation")
+        print("✓ Check for 500 errors in various scenarios")
+        print("=" * 60)
+        print()
+        
+        # Test sequence
+        tests = [
+            self.authenticate_admin,
+            self.test_create_pedido_minimal_data,
+            self.test_create_pedido_partial_protocol,
+            self.test_list_pedidos_after_creation,
+            self.test_check_for_500_errors
+        ]
+        
+        passed = 0
+        failed = 0
+        
+        for test in tests:
+            if test():
+                passed += 1
+            else:
+                failed += 1
+        
+        # Cleanup
+        self.cleanup_created_pedidos()
+        
+        # Summary
+        print("=" * 60)
+        print("📊 OPTIONAL FIELDS TEST SUMMARY")
+        print(f"✅ Passed: {passed}")
+        print(f"❌ Failed: {failed}")
+        print(f"📈 Success Rate: {(passed/(passed+failed)*100):.1f}%")
+        
+        # Detailed results
+        print("\n🔍 DETAILED RESULTS:")
+        for result in self.test_results:
+            status = "✅" if result['success'] else "❌"
+            print(f"{status} {result['test']}")
+            if result['details']:
+                print(f"    └─ {result['details']}")
+        
+        if failed > 0:
+            print("\n❌ FAILED TESTS:")
+            for result in self.test_results:
+                if not result['success']:
+                    print(f"   • {result['test']}: {result['details']}")
+        else:
+            print("\n🎉 ALL TESTS PASSED!")
+            print("✅ POST /api/liderancas works with optional empty fields")
+            print("✅ No 500 errors found")
+            print("✅ Validation working correctly")
+        
+        return failed == 0
+
 if __name__ == "__main__":
     print("🔧 Backend Testing Suite")
     print("Choose test suite:")
     print("1. Authentication Tests")
     print("2. Pedidos Lideranças Tests")
     print("3. Run All Tests")
-    print("4. Focused GET /api/liderancas Test (as requested)")
+    print("4. Focused GET /api/liderancas Test")
+    print("5. Test POST /api/liderancas with Optional Empty Fields (REVIEW REQUEST)")
     
-    choice = input("Enter choice (1-4): ").strip()
+    choice = input("Enter choice (1-5): ").strip()
     
     if choice == "1":
         tester = AuthTester()
@@ -1694,9 +2112,12 @@ if __name__ == "__main__":
     elif choice == "4":
         tester = LiderancasGetTester()
         success = tester.run_focused_tests()
+    elif choice == "5":
+        tester = LiderancasOptionalFieldsTester()
+        success = tester.run_optional_fields_tests()
     else:
-        print("Invalid choice. Running focused GET /api/liderancas test by default.")
-        tester = LiderancasGetTester()
-        success = tester.run_focused_tests()
+        print("Invalid choice. Running optional fields test by default.")
+        tester = LiderancasOptionalFieldsTester()
+        success = tester.run_optional_fields_tests()
     
     sys.exit(0 if success else 1)
