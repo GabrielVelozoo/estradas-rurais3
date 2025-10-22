@@ -1738,14 +1738,13 @@ class LiderancasOptionalFieldsTester:
             
         try:
             pedido_data = {
-                "municipio_id": "PR001",
+                "municipio_id": 1,
                 "municipio_nome": "Curitiba",
-                "lideranca_nome": "João Teste",
-                "titulo": "",
+                "pedido_titulo": "João Teste",
+                "nome_lideranca": "João Teste",
+                "numero_lideranca": "41999887766",
                 "protocolo": "",
-                "lideranca_telefone": "",
-                "descricao": "",
-                "status": None
+                "descricao": ""
             }
             
             response = self.session.post(
