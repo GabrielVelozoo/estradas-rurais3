@@ -2093,6 +2093,429 @@ class LiderancasOptionalFieldsTester:
         
         return failed == 0
 
+
+class LiderancasV2Tester:
+    """Test Lideranças V2 endpoints as requested in review"""
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        })
+        self.test_results = []
+        self.auth_cookies = None
+        self.created_pedido_ids = []
+        
+    def log_test(self, test_name, success, details="", response_data=None):
+        """Log test results"""
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status} {test_name}")
+        if details:
+            print(f"   Details: {details}")
+        if response_data and not success:
+            print(f"   Response: {response_data}")
+        print()
+        
+        self.test_results.append({
+            'test': test_name,
+            'success': success,
+            'details': details,
+            'response': response_data
+        })
+    
+    def authenticate(self):
+        """Authenticate with gabriel/gggr181330 credentials"""
+        try:
+            response = self.session.post(
+                f"{BACKEND_URL}/auth/login",
+                json={
+                    "username": "gabriel",
+                    "password": "gggr181330"
+                }
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("message") == "Login successful":
+                    self.auth_cookies = response.cookies
+                    self.log_test(
+                        "1. Login (gabriel/gggr181330)",
+                        True,
+                        f"Successfully authenticated user: {data.get('user', {}).get('username', 'N/A')}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "1. Login (gabriel/gggr181330)",
+                        False,
+                        "Login response format incorrect",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "1. Login (gabriel/gggr181330)",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "1. Login (gabriel/gggr181330)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_create_pedido_minimal(self):
+        """Test creating minimal pedido (only required fields)"""
+        if not self.auth_cookies:
+            self.log_test(
+                "2. Create minimal pedido",
+                False,
+                "No authentication cookies available"
+            )
+            return False
+            
+        try:
+            pedido_data = {
+                "municipio_id": "1",
+                "municipio_nome": "Curitiba",
+                "lideranca_nome": "João Teste",
+                "titulo": "",
+                "protocolo": "",
+                "lideranca_telefone": "",
+                "descricao": "",
+                "status": None
+            }
+            
+            response = self.session.post(
+                f"{BACKEND_URL}/liderancas",
+                json=pedido_data,
+                cookies=self.auth_cookies
+            )
+            
+            if response.status_code == 201:
+                data = response.json()
+                if (data.get("municipio_nome") == pedido_data["municipio_nome"] and 
+                    data.get("lideranca_nome") == pedido_data["lideranca_nome"] and
+                    data.get("id")):
+                    self.created_pedido_ids.append(data.get("id"))
+                    self.log_test(
+                        "2. Create minimal pedido",
+                        True,
+                        f"Successfully created minimal pedido, ID: {data.get('id')}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "2. Create minimal pedido",
+                        False,
+                        "Response data mismatch",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "2. Create minimal pedido",
+                    False,
+                    f"Expected 201, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "2. Create minimal pedido",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_create_pedido_complete(self):
+        """Test creating complete pedido"""
+        if not self.auth_cookies:
+            self.log_test(
+                "3. Create complete pedido",
+                False,
+                "No authentication cookies available"
+            )
+            return False
+            
+        try:
+            pedido_data = {
+                "municipio_id": "2",
+                "municipio_nome": "Londrina",
+                "lideranca_nome": "Maria Silva",
+                "titulo": "Reparo de Ponte",
+                "protocolo": "12.345.678-9",
+                "lideranca_telefone": "(41) 99999-8888",
+                "descricao": "Necessário reparo urgente",
+                "status": "em_andamento"
+            }
+            
+            response = self.session.post(
+                f"{BACKEND_URL}/liderancas",
+                json=pedido_data,
+                cookies=self.auth_cookies
+            )
+            
+            if response.status_code == 201:
+                data = response.json()
+                if (data.get("municipio_nome") == pedido_data["municipio_nome"] and 
+                    data.get("lideranca_nome") == pedido_data["lideranca_nome"] and
+                    data.get("titulo") == pedido_data["titulo"] and
+                    data.get("protocolo") == pedido_data["protocolo"] and
+                    data.get("id")):
+                    self.created_pedido_ids.append(data.get("id"))
+                    self.log_test(
+                        "3. Create complete pedido",
+                        True,
+                        f"Successfully created complete pedido with protocol {data.get('protocolo')}, ID: {data.get('id')}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "3. Create complete pedido",
+                        False,
+                        "Response data mismatch",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "3. Create complete pedido",
+                    False,
+                    f"Expected 201, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "3. Create complete pedido",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_list_pedidos(self):
+        """Test listing pedidos - should return 2 pedidos without error 500"""
+        if not self.auth_cookies:
+            self.log_test(
+                "4. List pedidos (GET /api/liderancas)",
+                False,
+                "No authentication cookies available"
+            )
+            return False
+            
+        try:
+            response = self.session.get(
+                f"{BACKEND_URL}/liderancas",
+                cookies=self.auth_cookies
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    pedido_count = len(data)
+                    # Check if we have the expected pedidos
+                    has_curitiba = any(p.get("municipio_nome") == "Curitiba" for p in data)
+                    has_londrina = any(p.get("municipio_nome") == "Londrina" for p in data)
+                    
+                    if pedido_count >= 2 and has_curitiba and has_londrina:
+                        self.log_test(
+                            "4. List pedidos (GET /api/liderancas)",
+                            True,
+                            f"✅ Status 200 ✅ Returns array ✅ Count: {pedido_count} pedidos ✅ Contains expected pedidos"
+                        )
+                        return True
+                    elif pedido_count >= 2:
+                        self.log_test(
+                            "4. List pedidos (GET /api/liderancas)",
+                            True,
+                            f"✅ Status 200 ✅ Returns array ✅ Count: {pedido_count} pedidos (may include existing data)"
+                        )
+                        return True
+                    else:
+                        self.log_test(
+                            "4. List pedidos (GET /api/liderancas)",
+                            False,
+                            f"Expected at least 2 pedidos, got {pedido_count}",
+                            data
+                        )
+                else:
+                    self.log_test(
+                        "4. List pedidos (GET /api/liderancas)",
+                        False,
+                        "Response is not an array",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "4. List pedidos (GET /api/liderancas)",
+                    False,
+                    f"❌ ERROR {response.status_code} - Expected 200, no error 500",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "4. List pedidos (GET /api/liderancas)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_update_pedido(self):
+        """Test updating pedido - add protocolo to first pedido"""
+        if not self.auth_cookies or not self.created_pedido_ids:
+            self.log_test(
+                "5. Update pedido (PUT /api/liderancas/{id})",
+                False,
+                "No authentication cookies or pedido ID available"
+            )
+            return False
+            
+        try:
+            first_pedido_id = self.created_pedido_ids[0]
+            update_data = {
+                "protocolo": "99.888.777-6"
+            }
+            
+            response = self.session.put(
+                f"{BACKEND_URL}/liderancas/{first_pedido_id}",
+                json=update_data,
+                cookies=self.auth_cookies
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if (data.get("id") == first_pedido_id and
+                    data.get("protocolo") == update_data["protocolo"]):
+                    self.log_test(
+                        "5. Update pedido (PUT /api/liderancas/{id})",
+                        True,
+                        f"Successfully updated pedido with protocol: {data.get('protocolo')}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "5. Update pedido (PUT /api/liderancas/{id})",
+                        False,
+                        "Updated data not reflected in response",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "5. Update pedido (PUT /api/liderancas/{id})",
+                    False,
+                    f"Expected 200, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "5. Update pedido (PUT /api/liderancas/{id})",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_delete_pedido(self):
+        """Test deleting pedido - delete first pedido"""
+        if not self.auth_cookies or not self.created_pedido_ids:
+            self.log_test(
+                "6. Delete pedido (DELETE /api/liderancas/{id})",
+                False,
+                "No authentication cookies or pedido ID available"
+            )
+            return False
+            
+        try:
+            first_pedido_id = self.created_pedido_ids[0]
+            
+            response = self.session.delete(
+                f"{BACKEND_URL}/liderancas/{first_pedido_id}",
+                cookies=self.auth_cookies
+            )
+            
+            if response.status_code == 204:
+                self.log_test(
+                    "6. Delete pedido (DELETE /api/liderancas/{id})",
+                    True,
+                    f"Successfully deleted pedido: {first_pedido_id}"
+                )
+                return True
+            else:
+                self.log_test(
+                    "6. Delete pedido (DELETE /api/liderancas/{id})",
+                    False,
+                    f"Expected 204, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "6. Delete pedido (DELETE /api/liderancas/{id})",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def run_v2_tests(self):
+        """Run all V2 tests as requested in review"""
+        print("🚀 TESTING LIDERANÇAS V2 - POST COLLECTION CLEANUP")
+        print(f"Backend URL: {BACKEND_URL}")
+        print("=" * 60)
+        print("REVIEW REQUEST TESTING:")
+        print("✓ Login with gabriel/gggr181330")
+        print("✓ Create minimal pedido (only required fields)")
+        print("✓ Create complete pedido")
+        print("✓ List pedidos (GET /api/liderancas) - should return 2 without error 500")
+        print("✓ Update pedido (PUT /api/liderancas/{id}) - add protocolo")
+        print("✓ Delete pedido (DELETE /api/liderancas/{id})")
+        print("=" * 60)
+        print()
+        
+        # Test sequence
+        tests = [
+            self.authenticate,
+            self.test_create_pedido_minimal,
+            self.test_create_pedido_complete,
+            self.test_list_pedidos,
+            self.test_update_pedido,
+            self.test_delete_pedido
+        ]
+        
+        passed = 0
+        failed = 0
+        
+        for test in tests:
+            if test():
+                passed += 1
+            else:
+                failed += 1
+        
+        # Summary
+        print("=" * 60)
+        print("📊 LIDERANÇAS V2 TEST SUMMARY")
+        print(f"✅ Passed: {passed}")
+        print(f"❌ Failed: {failed}")
+        print(f"📈 Success Rate: {(passed/(passed+failed)*100):.1f}%")
+        
+        # Detailed results
+        print("\n🔍 DETAILED RESULTS:")
+        for result in self.test_results:
+            status = "✅" if result['success'] else "❌"
+            print(f"{status} {result['test']}")
+            if result['details']:
+                print(f"    └─ {result['details']}")
+        
+        if failed > 0:
+            print("\n❌ FAILED TESTS:")
+            for result in self.test_results:
+                if not result['success']:
+                    print(f"   • {result['test']}: {result['details']}")
+        else:
+            print("\n🎉 ALL TESTS PASSED!")
+            print("✅ All Lideranças V2 endpoints working without error 500")
+            print("✅ CRUD operations functioning correctly")
+            print("✅ Authentication working properly")
+        
+        return failed == 0
+
+
 if __name__ == "__main__":
     print("🔧 Backend Testing Suite")
     print("Choose test suite:")
