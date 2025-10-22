@@ -363,6 +363,9 @@ backend:
         -working: true
         -agent: "testing"
         -comment: "✅ RETESTED - FOCUSED GET /api/liderancas VERIFICATION: Executed specific testing as requested in user review. GET /api/liderancas endpoint working perfectly: returns status 200, proper array format, all required fields present, no null/empty issues, data structure validation passed. Created and verified sample pedido (protocol 24.500.100-7). 5/5 focused tests passed (100% success rate). The reported 'Erro 500' is NOT from backend - issue is likely in frontend authentication or error handling."
+        -working: false
+        -agent: "testing"
+        -comment: "❌ LIDERANÇAS V2 POST-CLEANUP TESTING: Discovered critical issue - API still using V1 models despite V2 routes being active. CRUD operations partially working (5/6 tests passed, 83.3% success): ✅ Authentication (gabriel/gggr181330), ✅ Create minimal pedido (with V1 field names), ✅ Create complete pedido, ✅ Update pedido, ✅ Delete pedido. ❌ GET /api/liderancas fails with 500 error due to V1 model validation expecting non-empty strings. Root cause: Route conflict - API expects V1 field names (pedido_titulo, nome_lideranca, numero_lideranca) instead of V2 names (titulo, lideranca_nome, lideranca_telefone). Requires investigation of route registration and model conflicts."
 
 agent_communication:
     -agent: "main"
