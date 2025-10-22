@@ -518,7 +518,154 @@ export default function PedidosLiderancasV2() {
         </div>
       </div>
 
-      {/* Modal - continua na próxima parte */}
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold mb-6 text-gray-900">
+                {editingId ? 'Editar Pedido' : 'Adicionar Pedido'}
+              </h2>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Município */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Município <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.municipio_id}
+                    onChange={(e) => {
+                      const mun = municipios.find(m => m.id === e.target.value);
+                      setFormData({
+                        ...formData,
+                        municipio_id: e.target.value,
+                        municipio_nome: mun ? mun.nome : ''
+                      });
+                    }}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Selecione um município</option>
+                    {municipios.map(m => (
+                      <option key={m.id} value={m.id}>{m.nome}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Nome da Liderança */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nome da Liderança <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.lideranca_nome}
+                    onChange={(e) => setFormData({ ...formData, lideranca_nome: e.target.value })}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ex: João da Silva"
+                  />
+                </div>
+
+                {/* Título */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Título (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.titulo}
+                    onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ex: Reparo de estrada"
+                  />
+                </div>
+
+                {/* Protocolo */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Protocolo (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.protocolo}
+                    onChange={(e) => setFormData({ ...formData, protocolo: formatProtocolo(e.target.value) })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="00.000.000-0"
+                    maxLength={12}
+                  />
+                </div>
+
+                {/* Telefone */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Telefone da Liderança (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.lideranca_telefone}
+                    onChange={(e) => setFormData({ ...formData, lideranca_telefone: formatTelefone(e.target.value) })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="(00) 00000-0000"
+                    maxLength={15}
+                  />
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status (opcional)
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Selecione um status</option>
+                    {STATUS_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Descrição */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descrição (opcional)
+                  </label>
+                  <textarea
+                    value={formData.descricao}
+                    onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                    rows={4}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Detalhes adicionais sobre o pedido..."
+                  />
+                </div>
+
+                {/* Botões */}
+                <div className="flex gap-3 justify-end mt-6">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    disabled={submitting}
+                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {submitting ? 'Salvando...' : (editingId ? 'Atualizar' : 'Criar')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
