@@ -2177,15 +2177,15 @@ class LiderancasV2Tester:
             return False
             
         try:
+            # NOTE: API is still expecting V1 field names despite V2 routes being active
             pedido_data = {
                 "municipio_id": "1",
                 "municipio_nome": "Curitiba",
-                "lideranca_nome": "João Teste",
-                "titulo": "",
+                "pedido_titulo": "",
+                "nome_lideranca": "João Teste",
+                "numero_lideranca": "",
                 "protocolo": "",
-                "lideranca_telefone": "",
-                "descricao": "",
-                "status": None
+                "descricao": ""
             }
             
             response = self.session.post(
