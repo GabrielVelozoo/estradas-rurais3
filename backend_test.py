@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 
 # Get backend URL from frontend .env
-BACKEND_URL = "https://protocol-tracker-2.preview.emergentagent.com/api"
+BACKEND_URL = "https://lideranca-portal.preview.emergentagent.com/api"
 
 # Test credentials
 ADMIN_EMAIL = "admin@portal.gov.br"
