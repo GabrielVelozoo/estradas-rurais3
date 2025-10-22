@@ -4,6 +4,7 @@ import Home from "./components/Home";
 import EstradasRurais from "./components/EstradasRurais";
 import PedidosMaquinarios from "./components/PedidosMaquinarios";
 import PedidosLiderancas from "./components/PedidosLiderancas";
+import PedidosLiderancasV2 from "./components/PedidosLiderancasV2";
 import Municipios from "./components/Municipios";
 import Navbar from "./components/Navbar";
 import AdminPanel from "./components/AdminPanel";
