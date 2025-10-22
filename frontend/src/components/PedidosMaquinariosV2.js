@@ -454,4 +454,232 @@ export default function PedidosMaquinariosV2() {
     );
   }
 
-  // Continua com JSX...
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 p-8 print-container">
+      <div className="max-w-7xl mx-auto">
+        {/* Print Header */}
+        <PrintHeader 
+          titulo="Pedidos de Maquinários"
+          resumoFiltros={{
+            'Busca': buscaGeral || 'Todos',
+            'Município': filtroMunicipio || 'Todos',
+            'Status': filtroStatus ? formatStatus(filtroStatus) : 'Todos',
+            'Total de pedidos': pedidosFiltrados.length
+          }}
+        />
+
+        {/* Header */}
+        <div className="mb-8 no-print">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+            🚜 Pedidos de Maquinários
+          </h1>
+          <p className="text-gray-600">Gerencie os pedidos de equipamentos por município</p>
+        </div>
+
+        {/* Dashboard Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          {/* Card 1: Municípios */}
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-sm font-medium mb-1">Municípios</p>
+                <p className="text-3xl font-bold">{dashboardStats.municipiosDistintos}</p>
+              </div>
+              <div className="text-4xl opacity-20">🏘️</div>
+            </div>
+          </div>
+
+          {/* Card 2: Total Pedidos */}
+          <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-100 text-sm font-medium mb-1">Total de Pedidos</p>
+                <p className="text-3xl font-bold">{dashboardStats.totalPedidos}</p>
+              </div>
+              <div className="text-4xl opacity-20">📋</div>
+            </div>
+          </div>
+
+          {/* Card 3: Total Equipamentos */}
+          <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-orange-100 text-sm font-medium mb-1">Equipamentos</p>
+                <p className="text-3xl font-bold">{dashboardStats.totalEquipamentos}</p>
+              </div>
+              <div className="text-4xl opacity-20">🚜</div>
+            </div>
+          </div>
+
+          {/* Card 4: Valor Total */}
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-purple-100 text-sm font-medium mb-1">Valor Total</p>
+                <p className="text-2xl font-bold">{formatCurrency(dashboardStats.valorTotal)}</p>
+              </div>
+              <div className="text-4xl opacity-20">💰</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Barra de ações */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6 no-print">
+          <div className="flex flex-col gap-4">
+            {/* Linha 1: Busca e Botões */}
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+              <div className="flex-1 max-w-md">
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar por município, liderança, equipamento..."
+                  value={buscaGeral}
+                  onChange={(e) => setBuscaGeral(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium shadow-md"
+                >
+                  🖨️ Imprimir
+                </button>
+                
+                <button
+                  onClick={handleExportExcel}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-md"
+                >
+                  📊 Exportar Excel
+                </button>
+                
+                <button
+                  onClick={() => openModal()}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md"
+                >
+                  + Adicionar Pedido
+                </button>
+              </div>
+            </div>
+
+            {/* Linha 2: Filtros */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="Filtrar por município"
+                value={filtroMunicipio}
+                onChange={(e) => setFiltroMunicipio(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              />
+              
+              <select
+                value={filtroStatus}
+                onChange={(e) => setFiltroStatus(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">Filtrar por status</option>
+                {STATUS_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Contador */}
+          <div className="mt-4 text-sm text-gray-600">
+            {pedidosFiltrados.length} {pedidosFiltrados.length === 1 ? 'pedido encontrado' : 'pedidos encontrados'}
+            {(buscaGeral || filtroMunicipio || filtroStatus) && pedidosFiltrados.length < pedidos.length && 
+              ` (de ${pedidos.length} total)`}
+          </div>
+        </div>
+
+        {/* Erro */}
+        {erro && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
+            ⚠️ {erro}
+          </div>
+        )}
+
+        {/* Tabela */}
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          {pedidosFiltrados.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              {buscaGeral || filtroMunicipio || filtroStatus
+                ? '🔍 Nenhum pedido encontrado com esses critérios'
+                : '🚜 Nenhum pedido cadastrado ainda'}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gradient-to-r from-green-600 to-green-700 text-white">
+                  <tr>
+                    <th className="px-6 py-4 text-left font-semibold">Município</th>
+                    <th className="px-6 py-4 text-left font-semibold">Liderança</th>
+                    <th className="px-6 py-4 text-center font-semibold">Qtd Itens</th>
+                    <th className="px-6 py-4 text-right font-semibold">Valor Total</th>
+                    <th className="px-6 py-4 text-left font-semibold">Status</th>
+                    <th className="px-6 py-4 text-left font-semibold">Criado em</th>
+                    <th className="px-6 py-4 text-center font-semibold no-print">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pedidosFiltrados.map((pedido, index) => (
+                    <tr
+                      key={pedido.id}
+                      className={`border-b border-gray-100 hover:bg-green-50 transition-colors ${
+                        index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                      }`}
+                    >
+                      <td className="px-6 py-4 font-medium">{pedido.municipio_nome}</td>
+                      <td className="px-6 py-4">{pedido.lideranca_nome || '-'}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                          {pedido.itens?.length || 0}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right font-bold text-green-700">
+                        {formatCurrency(pedido.valor_total)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          pedido.status === 'atendido' ? 'bg-green-100 text-green-800' :
+                          pedido.status === 'em_andamento' ? 'bg-blue-100 text-blue-800' :
+                          pedido.status === 'aguardando_atendimento' ? 'bg-yellow-100 text-yellow-800' :
+                          pedido.status === 'arquivado' ? 'bg-gray-100 text-gray-800' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {formatStatus(pedido.status)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {new Date(pedido.created_at).toLocaleDateString('pt-BR')}
+                      </td>
+                      <td className="px-6 py-4 no-print">
+                        <div className="flex gap-2 justify-center">
+                          <button
+                            onClick={() => openModal(pedido)}
+                            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleDelete(pedido.id)}
+                            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal - continua na próxima parte */}
+    </div>
+  );
+}
