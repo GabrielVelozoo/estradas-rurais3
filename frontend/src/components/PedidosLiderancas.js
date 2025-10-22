@@ -100,6 +100,8 @@ export default function PedidosLiderancas() {
     setCarregando(true);
     setErro(null);
     try {
+      console.log('[fetchPedidos] Iniciando requisição para:', `${BACKEND_URL}/api/liderancas`);
+      
       const response = await fetch(`${BACKEND_URL}/api/liderancas`, {
         credentials: 'include',
         headers: {
@@ -107,17 +109,60 @@ export default function PedidosLiderancas() {
         }
       });
 
+      console.log('[fetchPedidos] Status da resposta:', response.status);
+
+      // Tratamento específico para erro de autenticação
+      if (response.status === 401) {
+        console.warn('[fetchPedidos] Não autorizado (401). Limpando sessão e redirecionando...');
+        localStorage.removeItem('user');
+        setErro('Sessão expirada. Por favor, faça login novamente.');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
+        return;
+      }
+
       if (!response.ok) {
-        throw new Error(`Erro ao carregar pedidos: ${response.status}`);
+        const errorText = await response.text();
+        console.error('[fetchPedidos] Erro na resposta:', errorText);
+        throw new Error(`Erro ao carregar pedidos (status ${response.status})`);
       }
 
       const data = await response.json();
-      setPedidos(data);
+      console.log('[fetchPedidos] Dados recebidos:', {
+        type: Array.isArray(data) ? 'array' : typeof data,
+        length: Array.isArray(data) ? data.length : 'N/A',
+        sample: Array.isArray(data) && data.length > 0 ? data[0] : 'vazio'
+      });
+
+      // Validar que os dados são um array
+      if (!Array.isArray(data)) {
+        console.error('[fetchPedidos] Dados recebidos não são um array:', data);
+        throw new Error('Formato de dados inválido recebido do servidor');
+      }
+
+      // Normalizar dados para garantir que todos os campos existam
+      const normalizedData = data.map(pedido => ({
+        id: pedido.id || '',
+        municipio_id: pedido.municipio_id || '',
+        municipio_nome: pedido.municipio_nome || '',
+        pedido_titulo: pedido.pedido_titulo || '',
+        protocolo: pedido.protocolo || '',
+        nome_lideranca: pedido.nome_lideranca || '',
+        numero_lideranca: pedido.numero_lideranca || '',
+        descricao: pedido.descricao || '',
+        created_at: pedido.created_at || '',
+        updated_at: pedido.updated_at || ''
+      }));
+
+      console.log('[fetchPedidos] Dados normalizados e prontos para uso');
+      setPedidos(normalizedData);
     } catch (error) {
-      console.error('Erro ao carregar pedidos:', error);
-      setErro(error.message);
+      console.error('[fetchPedidos] Erro capturado:', error);
+      setErro(error.message || 'Erro desconhecido ao carregar pedidos');
     } finally {
       setCarregando(false);
+      console.log('[fetchPedidos] Finalizado');
     }
   };
 
