@@ -51,9 +51,19 @@ function App() {
               } 
             />
 
-            {/* Página de Pedidos Lideranças */}
+            {/* Página de Pedidos Lideranças V2 (Nova versão) */}
             <Route 
               path="/pedidos-liderancas" 
+              element={
+                <ProtectedRoute>
+                  <PedidosLiderancasV2 />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* Página antiga de Pedidos Lideranças (manter por enquanto) */}
+            <Route 
+              path="/pedidos-liderancas-old" 
               element={
                 <ProtectedRoute>
                   <PedidosLiderancas />
