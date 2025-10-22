@@ -363,6 +363,9 @@ backend:
         -working: true
         -agent: "testing"
         -comment: "✅ COMPREHENSIVE TESTING COMPLETE - All Pedidos Lideranças endpoints working perfectly: Authentication with gabriel/gggr181330 successful, POST /api/liderancas creates pedidos with valid protocol format (24.298.238-6), protocol format validation working (rejects invalid formats like '12345' with 422), protocol uniqueness validation working (rejects duplicates with 400), GET /api/liderancas lists pedidos correctly, GET /api/liderancas/{id} retrieves specific pedidos, PUT /api/liderancas/{id} updates pedidos and protocols, DELETE /api/liderancas/{id} removes pedidos (204), deleted pedidos return 404. Additional validation tests: all invalid protocol formats correctly rejected (123.456.789-0, 12.34.567-8, 12.345.678, 12-345-678-9, AB.123.456-7, 12.345.678-AB), all valid formats accepted (00.000.000-0, 99.999.999-9, 12.345.678-0). 10/10 core tests + 9/9 validation tests passed (100% success rate). Fixed route prefix issue in liderancas_routes.py."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ RETESTED - FOCUSED GET /api/liderancas VERIFICATION: Executed specific testing as requested in user review. GET /api/liderancas endpoint working perfectly: returns status 200, proper array format, all required fields present, no null/empty issues, data structure validation passed. Created and verified sample pedido (protocol 24.500.100-7). 5/5 focused tests passed (100% success rate). The reported 'Erro 500' is NOT from backend - issue is likely in frontend authentication or error handling."
 
 agent_communication:
     -agent: "main"
