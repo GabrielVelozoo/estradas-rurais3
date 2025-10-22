@@ -1517,15 +1517,92 @@ class LiderancasGetTester:
             )
         return False
     
+    def verify_data_structure(self):
+        """Verify that returned data has proper structure and no null issues"""
+        if not self.auth_cookies:
+            self.log_test(
+                "Data structure verification",
+                False,
+                "No authentication cookies available"
+            )
+            return False
+            
+        try:
+            response = self.session.get(
+                f"{BACKEND_URL}/liderancas",
+                cookies=self.auth_cookies
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list) and len(data) > 0:
+                    issues = []
+                    
+                    for i, pedido in enumerate(data):
+                        # Check for required fields
+                        required_fields = ['id', 'municipio_id', 'municipio_nome', 'pedido_titulo', 'nome_lideranca', 'numero_lideranca', 'created_at', 'updated_at']
+                        for field in required_fields:
+                            if field not in pedido:
+                                issues.append(f"Item {i}: Missing field '{field}'")
+                            elif pedido[field] is None:
+                                issues.append(f"Item {i}: Field '{field}' is null")
+                        
+                        # Check for empty strings in critical fields
+                        critical_fields = ['municipio_nome', 'pedido_titulo', 'nome_lideranca', 'numero_lideranca']
+                        for field in critical_fields:
+                            if field in pedido and pedido[field] == "":
+                                issues.append(f"Item {i}: Field '{field}' is empty string")
+                    
+                    if issues:
+                        self.log_test(
+                            "Data structure verification",
+                            False,
+                            f"Found {len(issues)} data issues",
+                            issues[:5]  # Show first 5 issues
+                        )
+                    else:
+                        self.log_test(
+                            "Data structure verification",
+                            True,
+                            f"All {len(data)} pedidos have proper data structure with no null/empty issues"
+                        )
+                        return True
+                else:
+                    self.log_test(
+                        "Data structure verification",
+                        True,
+                        "Empty array - no data structure issues (database is empty)"
+                    )
+                    return True
+            else:
+                self.log_test(
+                    "Data structure verification",
+                    False,
+                    f"Expected status 200, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "Data structure verification",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+
     def run_focused_tests(self):
         """Run focused tests for GET /api/liderancas as requested"""
         print("🎯 FOCUSED TESTING: GET /api/liderancas Endpoint")
         print(f"Backend URL: {BACKEND_URL}")
-        print("Testing as requested in review:")
-        print("- Authentication with admin@portal.gov.br / admin123")
-        print("- GET /api/liderancas endpoint verification")
-        print("- Data format validation")
-        print("- Sample data creation if needed")
+        print("=" * 60)
+        print("REVIEW REQUEST TESTING:")
+        print("✓ Testar endpoint GET /api/liderancas")
+        print("✓ Verificar se retorna status 200")
+        print("✓ Verificar se retorna um array (mesmo que vazio)")
+        print("✓ Verificar o formato dos dados retornados")
+        print("✓ Criar um pedido de teste (se o banco estiver vazio)")
+        print("✓ Listar novamente e verificar estrutura dos dados")
+        print("✓ Confirmar que todos os campos esperados estão presentes")
+        print("✓ Verificar se não há valores null problemáticos")
         print("=" * 60)
         print()
         
@@ -1534,7 +1611,8 @@ class LiderancasGetTester:
             self.authenticate_admin,
             self.test_get_liderancas_endpoint,
             self.test_create_sample_pedido,
-            self.test_get_liderancas_after_creation
+            self.test_get_liderancas_after_creation,
+            self.verify_data_structure
         ]
         
         passed = 0
@@ -1548,16 +1626,31 @@ class LiderancasGetTester:
         
         # Summary
         print("=" * 60)
-        print("📊 FOCUSED TEST SUMMARY")
+        print("📊 FOCUSED TEST SUMMARY - GET /api/liderancas")
         print(f"✅ Passed: {passed}")
         print(f"❌ Failed: {failed}")
         print(f"📈 Success Rate: {(passed/(passed+failed)*100):.1f}%")
+        
+        # Detailed results
+        print("\n🔍 DETAILED RESULTS:")
+        for result in self.test_results:
+            status = "✅" if result['success'] else "❌"
+            print(f"{status} {result['test']}")
+            if result['details']:
+                print(f"    └─ {result['details']}")
         
         if failed > 0:
             print("\n❌ FAILED TESTS:")
             for result in self.test_results:
                 if not result['success']:
                     print(f"   • {result['test']}: {result['details']}")
+        else:
+            print("\n🎉 ALL TESTS PASSED!")
+            print("✅ GET /api/liderancas endpoint is working correctly")
+            print("✅ Returns status 200")
+            print("✅ Returns proper array format")
+            print("✅ Data structure is valid")
+            print("✅ No null/empty value issues found")
         
         return failed == 0
 
