@@ -1822,13 +1822,14 @@ class LiderancasOptionalFieldsTester:
             
         try:
             pedido_data = {
-                "municipio_id": 2,
+                "municipio_id": "PR002",
                 "municipio_nome": "Londrina",
-                "pedido_titulo": "Teste",
-                "nome_lideranca": "Maria Teste",
-                "numero_lideranca": "41999887766",
+                "lideranca_nome": "Maria Teste",
+                "titulo": "Teste",
                 "protocolo": "12.345",
-                "descricao": "Teste"
+                "lideranca_telefone": "(41) 9",
+                "descricao": "Teste",
+                "status": "em_andamento"
             }
             
             response = self.session.post(
