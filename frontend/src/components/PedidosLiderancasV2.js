@@ -223,4 +223,116 @@ export default function PedidosLiderancasV2() {
     setEditingId(null);
   };
 
-  // Continua na próxima parte...
+  // Submeter formulário
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validações
+    if (!formData.municipio_id || !formData.lideranca_nome) {
+      alert('Município e Liderança são obrigatórios!');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const url = editingId 
+        ? `${BACKEND_URL}/api/liderancas/${editingId}`
+        : `${BACKEND_URL}/api/liderancas`;
+      
+      const method = editingId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail?.error || errorData.detail || 'Erro ao salvar');
+      }
+
+      await fetchPedidos();
+      closeModal();
+      alert(editingId ? 'Pedido atualizado com sucesso!' : 'Pedido criado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      alert(error.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Deletar pedido
+  const handleDelete = async (id) => {
+    if (!window.confirm('Tem certeza que deseja excluir este pedido?')) return;
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/liderancas/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao excluir');
+      }
+
+      await fetchPedidos();
+      alert('Pedido excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir:', error);
+      alert(error.message);
+    }
+  };
+
+  // Exportar para Excel (respeitando filtros)
+  const handleExportExcel = () => {
+    try {
+      const dadosExport = pedidosFiltrados.map(p => ({
+        'Protocolo': p.protocolo || '-',
+        'Título': p.titulo || '-',
+        'Município': p.municipio_nome || '-',
+        'Liderança': p.lideranca_nome || '-',
+        'Telefone': p.lideranca_telefone || '-',
+        'Status': p.status ? STATUS_OPTIONS.find(s => s.value === p.status)?.label : '-',
+        'Descrição': p.descricao || '-',
+        'Criado em': new Date(p.created_at).toLocaleString('pt-BR')
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(dadosExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Pedidos Lideranças');
+      XLSX.writeFile(wb, `pedidos_liderancas_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (error) {
+      console.error('Erro ao exportar:', error);
+      alert('Erro ao exportar para Excel');
+    }
+  };
+
+  // Formatar status para exibição
+  const formatStatus = (status) => {
+    if (!status) return '-';
+    const opt = STATUS_OPTIONS.find(s => s.value === status);
+    return opt ? opt.label : status;
+  };
+
+  // Loading
+  if (carregando) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="h-12 bg-gray-200 rounded w-1/3 mb-8 animate-pulse"></div>
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-20 bg-gray-100 rounded animate-pulse"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Continua com o JSX...
