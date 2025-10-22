@@ -85,10 +85,17 @@ class PedidoLiderancaUpdate(BaseModel):
         # Aceitar qualquer quantidade de dígitos (sem limite superior)
         return v
 
-class PedidoLiderancaResponse(PedidoLiderancaBase):
-    """Schema de resposta com campos adicionais"""
+class PedidoLiderancaResponse(BaseModel):
+    """Schema de resposta com campos adicionais - permite campos vazios para compatibilidade"""
     id: str
     user_id: str
+    municipio_id: int = Field(..., description="ID do município")
+    municipio_nome: str = Field(..., max_length=200, description="Nome do município")
+    pedido_titulo: str = Field(..., max_length=200, description="Título do pedido")
+    protocolo: str = Field(default="", description="Protocolo no formato 00.000.000-0")
+    nome_lideranca: str = Field(..., max_length=200, description="Nome da liderança")
+    numero_lideranca: str = Field(..., max_length=100, description="Número da liderança")
+    descricao: str = Field(default="", max_length=2000, description="Descrição detalhada do pedido")
     created_at: str
     updated_at: str
 
