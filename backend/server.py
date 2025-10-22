@@ -116,6 +116,9 @@ app.include_router(pedidos_router, prefix="/api")
 app.include_router(liderancas_router, prefix="/api")
 app.include_router(maquinarios_router, prefix="/api")
 app.include_router(municipios_router, prefix="/api")
+# V2 Routes
+app.include_router(liderancas_v2_router, prefix="/api")
+app.include_router(maquinarios_v2_router, prefix="/api")
 
 # ---------- EVENTOS DE INICIALIZAÇÃO ----------
 @app.on_event("startup")
