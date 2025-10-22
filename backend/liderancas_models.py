@@ -86,7 +86,7 @@ class PedidoLiderancaUpdate(BaseModel):
         return v
 
 class PedidoLiderancaResponse(BaseModel):
-    """Schema de resposta com campos adicionais - permite campos vazios para compatibilidade"""
+    """Schema de resposta com campos adicionais - permite campos vazios para compatibilidade - UPDATED"""
     id: str
     user_id: str
     municipio_id: int = Field(..., description="ID do município")
