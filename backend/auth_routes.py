@@ -59,12 +59,16 @@ async def login(
     )
     
     # Set secure cookie (7 days expiration)
+    # Detectar ambiente: produção precisa de Secure=True e SameSite=None
+    import os
+    is_production = "emergent.host" in os.environ.get("CORS_ORIGINS", "")
+    
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,  # Changed to False for development/preview environment
-        samesite="lax",
+        secure=is_production,  # True em produção, False em dev/preview
+        samesite="none" if is_production else "lax",  # none para produção, lax para dev
         max_age=7 * 24 * 60 * 60  # 7 days in seconds
     )
     
