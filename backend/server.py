@@ -33,6 +33,33 @@ db = client[os.environ["DB_NAME"]]
 app = FastAPI()
 app.state.db = db
 
+# ---------- LOGGING (antes de tudo) ----------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+# ---------- CORS CONFIGURADO (antes das rotas) ----------
+# Configuração de CORS para produção e desenvolvimento
+raw_origins = os.environ.get("CORS_ORIGINS", "*")
+origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+
+# Se temos origens específicas, habilitar credentials
+allow_credentials = not (len(origins) == 1 and origins[0] == "*")
+
+# Log das origens configuradas para debug
+logger.info(f"CORS configurado com origens: {origins}")
+logger.info(f"CORS allow_credentials: {allow_credentials}")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins if allow_credentials else ["*"],
+    allow_credentials=allow_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Criação do router /api
 api_router = APIRouter(prefix="/api")
 
