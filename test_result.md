@@ -309,9 +309,6 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Testar backend de Pedidos Lideranças (POST, GET, PUT, DELETE)"
-    - "Testar validação de formato de protocolo (00.000.000-0)"
-    - "Testar validação de protocolo único"
     - "Testar frontend - criação, edição, exclusão de pedidos"
     - "Testar busca acento-insensível"
     - "Testar botão copiar protocolo"
