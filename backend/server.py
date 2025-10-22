@@ -129,6 +129,20 @@ async def startup_event():
         await db.pedidos_liderancas.create_index("id", unique=True)
         await db.pedidos_maquinarios_v2.create_index("id", unique=True)
         await db.users.create_index("username", unique=True)
+        
+        # Índices para V2 (novas coleções)
+        await db.pedidos_liderancas_v2.create_index("id", unique=True)
+        await db.pedidos_liderancas_v2.create_index("created_at")
+        await db.pedidos_liderancas_v2.create_index("municipio_nome")
+        await db.pedidos_liderancas_v2.create_index("lideranca_nome")
+        await db.pedidos_liderancas_v2.create_index("protocolo")
+        
+        await db.pedidos_maquinarios_v2.create_index("id", unique=True)
+        await db.pedidos_maquinarios_v2.create_index("created_at")
+        await db.pedidos_maquinarios_v2.create_index("municipio_nome")
+        await db.pedidos_maquinarios_v2.create_index("itens.equipamento")
+        
+        logger.info("Índices criados/verificados com sucesso")
 
         # Criação do usuário admin padrão
         admin_user = await db.users.find_one({"username": "gabriel"})
