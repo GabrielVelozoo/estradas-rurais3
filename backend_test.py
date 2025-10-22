@@ -2178,12 +2178,13 @@ class LiderancasV2Tester:
             
         try:
             # NOTE: API is still expecting V1 field names despite V2 routes being active
+            # V1 model requires non-empty strings for pedido_titulo and numero_lideranca
             pedido_data = {
                 "municipio_id": "1",
                 "municipio_nome": "Curitiba",
-                "pedido_titulo": "",
+                "pedido_titulo": "Pedido Mínimo",
                 "nome_lideranca": "João Teste",
-                "numero_lideranca": "",
+                "numero_lideranca": "41999887766",
                 "protocolo": "",
                 "descricao": ""
             }
