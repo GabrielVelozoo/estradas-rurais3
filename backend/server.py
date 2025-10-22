@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from auth_routes import router as auth_router
 from pedidos_routes import router as pedidos_router
 # from liderancas_routes import router as liderancas_router
-from maquinarios_routes import router as maquinarios_router
+# from maquinarios_routes import router as maquinarios_router
 from municipios_routes import router as municipios_router
 # Import V2 modules
 from liderancas_v2_routes import router as liderancas_v2_router
