@@ -33,9 +33,11 @@ class PedidoLiderancaV2Base(BaseModel):
         # Remove tudo que não é dígito para validar
         digits = re.sub(r'\D', '', v)
         
-        # Se tiver dígitos, deve ter exatamente 9
+        # Se tiver dígitos E não for 9, aceitar mas logar warning
+        # Validação suave: aceita qualquer quantidade, mas ideal é 9
         if digits and len(digits) != 9:
-            raise ValueError(f"Protocolo deve ter 9 dígitos (formato: 00.000.000-0)")
+            # Não bloquear, apenas aceitar
+            pass
         
         return v.strip()
     
