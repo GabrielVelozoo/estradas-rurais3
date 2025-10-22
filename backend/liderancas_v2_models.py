@@ -89,10 +89,7 @@ class PedidoLiderancaV2Update(BaseModel):
         if v is None or v.strip() == "":
             return ""
         
-        digits = re.sub(r'\D', '', v)
-        if digits and len(digits) != 9:
-            raise ValueError(f"Protocolo deve ter 9 dígitos (formato: 00.000.000-0)")
-        
+        # Validação suave: aceita qualquer quantidade de dígitos
         return v.strip()
     
     @validator('lideranca_telefone')
@@ -101,10 +98,7 @@ class PedidoLiderancaV2Update(BaseModel):
         if v is None or v.strip() == "":
             return ""
         
-        digits = re.sub(r'\D', '', v)
-        if digits and len(digits) not in [10, 11]:
-            raise ValueError(f"Telefone deve ter 10 ou 11 dígitos")
-        
+        # Validação suave: aceita qualquer quantidade de dígitos
         return v.strip()
 
 
