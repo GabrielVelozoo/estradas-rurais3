@@ -421,7 +421,7 @@ export default function PedidosLiderancas() {
   };
 
   // Filtrar pedidos pela busca com tratamento de erro robusto
-  const pedidosFiltrados = React.useMemo(() => {
+  const pedidosFiltrados = useMemo(() => {
     try {
       // Garantir que pedidos é um array válido
       if (!Array.isArray(pedidos)) {
