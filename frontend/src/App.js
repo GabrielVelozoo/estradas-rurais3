@@ -125,8 +125,10 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-          </Routes>
-        </AuthProvider>
+              </Routes>
+            </Suspense>
+          </AuthProvider>
+        </DataCacheProvider>
       </BrowserRouter>
     </div>
   );
