@@ -547,7 +547,9 @@ export default function PedidosLiderancasV2() {
                         index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                       }`}
                     >
-                      <td className="px-6 py-4 font-mono text-sm">{pedido.protocolo || '-'}</td>
+                      <td className="px-6 py-4 font-mono text-sm">
+                        <ProtocolLink protocolo={pedido.protocolo} />
+                      </td>
                       <td className="px-6 py-4">{pedido.titulo || '-'}</td>
                       <td className="px-6 py-4 font-medium">{pedido.municipio_nome}</td>
                       <td className="px-6 py-4">{pedido.lideranca_nome}</td>
