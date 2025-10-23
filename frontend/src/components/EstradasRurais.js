@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useDataCache } from '../contexts/DataCacheContext';
 
 const SHEET_ID = process.env.REACT_APP_SHEET_ID;
 const API_KEY = process.env.REACT_APP_SHEETS_API_KEY;
