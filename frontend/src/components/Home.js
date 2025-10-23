@@ -39,25 +39,25 @@ const Home = () => {
           </p>
         </div>
 
-        {/* Cards de Navegação - Principais no Topo */}
-        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-8">
+        {/* Cards de Navegação - Todos Padronizados */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {/* Card Pedidos Lideranças */}
           <Link 
             to="/pedidos-liderancas" 
-            className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl shadow-lg p-8 border-l-4 border-blue-500 hover:shadow-2xl transition-all duration-300 text-white group"
+            className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 text-white group h-full"
           >
-            <div className="text-center">
+            <div className="flex flex-col items-center justify-center text-center p-8 h-72">
               <div className="text-6xl mb-4 group-hover:scale-110 transition-transform duration-300">
                 📋
               </div>
-              <h2 className="text-3xl font-bold mb-3">
+              <h2 className="text-2xl font-bold mb-3">
                 Pedidos de Lideranças
               </h2>
-              <p className="mb-4 opacity-90 text-lg">
+              <p className="mb-4 opacity-90 text-sm">
                 Gerencie pedidos das lideranças com protocolo e acompanhamento
               </p>
-              <div className="inline-flex items-center px-6 py-3 bg-white/20 rounded-lg backdrop-blur-sm font-medium group-hover:bg-white/30 transition-colors">
-                Acessar Sistema →
+              <div className="mt-auto inline-flex items-center px-4 py-2 bg-white/20 rounded-lg backdrop-blur-sm text-sm font-medium group-hover:bg-white/30 transition-colors">
+                Acessar →
               </div>
             </div>
           </Link>
@@ -65,44 +65,41 @@ const Home = () => {
           {/* Card Pedidos de Maquinários */}
           <Link 
             to="/pedidos-maquinarios" 
-            className="bg-gradient-to-br from-green-600 to-green-700 rounded-xl shadow-lg p-8 border-l-4 border-green-500 hover:shadow-2xl transition-all duration-300 text-white group"
+            className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 text-white group h-full"
           >
-            <div className="text-center">
+            <div className="flex flex-col items-center justify-center text-center p-8 h-72">
               <div className="text-6xl mb-4 group-hover:scale-110 transition-transform duration-300">
                 🚜
               </div>
-              <h2 className="text-3xl font-bold mb-3">
+              <h2 className="text-2xl font-bold mb-3">
                 Pedidos de Maquinários
               </h2>
-              <p className="mb-4 opacity-90 text-lg">
+              <p className="mb-4 opacity-90 text-sm">
                 Sistema completo de gestão de pedidos de equipamentos por município
               </p>
-              <div className="inline-flex items-center px-6 py-3 bg-white/20 rounded-lg backdrop-blur-sm font-medium group-hover:bg-white/30 transition-colors">
-                Acessar Sistema →
+              <div className="mt-auto inline-flex items-center px-4 py-2 bg-white/20 rounded-lg backdrop-blur-sm text-sm font-medium group-hover:bg-white/30 transition-colors">
+                Acessar →
               </div>
             </div>
           </Link>
-        </div>
 
-        {/* Cards Secundários */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {/* Card Estradas Rurais */}
           <Link 
             to="/estradas-rurais" 
-            className="group bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-200 hover:border-blue-300"
+            className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 text-white group h-full"
           >
-            <div className="text-center">
-              <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">
+            <div className="flex flex-col items-center justify-center text-center p-8 h-72">
+              <div className="text-6xl mb-4 group-hover:scale-110 transition-transform duration-300">
                 🛣️
               </div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-3">
+              <h2 className="text-2xl font-bold mb-3">
                 Estradas Rurais
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="mb-4 opacity-90 text-sm">
                 Consulte informações sobre projetos e investimentos em estradas rurais municipais
               </p>
-              <div className="text-blue-600 font-medium group-hover:text-blue-700">
-                Acessar Sistema →
+              <div className="mt-auto inline-flex items-center px-4 py-2 bg-white/20 rounded-lg backdrop-blur-sm text-sm font-medium group-hover:bg-white/30 transition-colors">
+                Acessar →
               </div>
             </div>
           </Link>
