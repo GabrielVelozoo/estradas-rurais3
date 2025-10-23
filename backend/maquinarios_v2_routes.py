@@ -225,8 +225,11 @@ async def update_pedido(
         for field, value in pedido_data.dict(exclude_unset=True).items():
             if value is not None:
                 if field == "itens":
-                    # Converter itens para dict
-                    update_data[field] = [item.dict() for item in value]
+                    # Converter itens para dict (verificar se já não é dict)
+                    update_data[field] = [
+                        item if isinstance(item, dict) else item.dict() 
+                        for item in value
+                    ]
                 else:
                     update_data[field] = value
         
