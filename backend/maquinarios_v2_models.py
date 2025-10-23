@@ -65,6 +65,13 @@ class PedidoMaquinarioV2Base(BaseModel):
     valor_total: float
     status: Optional[str] = None  # em_andamento, aguardando_atendimento, arquivado, atendido, null
     
+    @validator('municipio_id', pre=True)
+    def coerce_municipio_id(cls, v):
+        """Converter qualquer tipo para string (tolerância)"""
+        if v is None:
+            raise ValueError("municipio_id é obrigatório")
+        return str(v)
+    
     @validator('status')
     def validate_status(cls, v):
         """Validar status permitido"""
