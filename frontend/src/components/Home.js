@@ -105,37 +105,55 @@ const Home = () => {
           </Link>
 
           {/* Card Relatórios */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 opacity-75">
-            <div className="text-center">
-              <div className="text-5xl mb-4 opacity-50">
+          <div className="bg-gradient-to-br from-orange-400 to-orange-500 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 text-white opacity-60 cursor-not-allowed h-full">
+            <div className="flex flex-col items-center justify-center text-center p-8 h-72">
+              <div className="text-6xl mb-4 opacity-70">
                 📊
               </div>
-              <h2 className="text-2xl font-bold text-gray-500 mb-3">
+              <h2 className="text-2xl font-bold mb-3">
                 Relatórios
               </h2>
-              <p className="text-gray-400 mb-4">
+              <p className="mb-4 opacity-90 text-sm">
                 Em breve: Dashboards e relatórios analíticos
               </p>
-              <div className="text-gray-400">
+              <div className="mt-auto inline-flex items-center px-4 py-2 bg-white/20 rounded-lg backdrop-blur-sm text-sm font-medium">
                 Em desenvolvimento
               </div>
             </div>
           </div>
 
           {/* Card Dados do Gov */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 opacity-75">
-            <div className="text-center">
-              <div className="text-5xl mb-4 opacity-50">
+          <div className="bg-gradient-to-br from-indigo-400 to-indigo-500 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 text-white opacity-60 cursor-not-allowed h-full">
+            <div className="flex flex-col items-center justify-center text-center p-8 h-72">
+              <div className="text-6xl mb-4 opacity-70">
                 🏛️
               </div>
-              <h2 className="text-2xl font-bold text-gray-500 mb-3">
+              <h2 className="text-2xl font-bold mb-3">
                 Dados do Gov
               </h2>
-              <p className="text-gray-400 mb-4">
-                Em breve: Sistema de acompanhamento em tempo real dos protocolos do gov
+              <p className="mb-4 opacity-90 text-sm">
+                Em breve: Sistema de acompanhamento em tempo real dos protocolos
               </p>
-              <div className="text-gray-400">
+              <div className="mt-auto inline-flex items-center px-4 py-2 bg-white/20 rounded-lg backdrop-blur-sm text-sm font-medium">
                 Em desenvolvimento
+              </div>
+            </div>
+          </div>
+
+          {/* Card Extra (para manter grid balanceado) */}
+          <div className="bg-gradient-to-br from-pink-400 to-pink-500 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 text-white opacity-60 cursor-not-allowed h-full">
+            <div className="flex flex-col items-center justify-center text-center p-8 h-72">
+              <div className="text-6xl mb-4 opacity-70">
+                💡
+              </div>
+              <h2 className="text-2xl font-bold mb-3">
+                Mais Recursos
+              </h2>
+              <p className="mb-4 opacity-90 text-sm">
+                Novos módulos e funcionalidades em breve
+              </p>
+              <div className="mt-auto inline-flex items-center px-4 py-2 bg-white/20 rounded-lg backdrop-blur-sm text-sm font-medium">
+                Em breve
               </div>
             </div>
           </div>
