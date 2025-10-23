@@ -162,14 +162,7 @@ export default function PedidosLiderancasV2() {
 
   useEffect(() => {
     fetchPedidos();
-    
-    // Cleanup: cancelar requisições ao desmontar
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
+  }, [fetchPedidos]);
 
   // Filtrar pedidos (acento-insensível)
   const pedidosFiltrados = useMemo(() => {
