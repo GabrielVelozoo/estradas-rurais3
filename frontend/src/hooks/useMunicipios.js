@@ -92,7 +92,7 @@ export function useMunicipios() {
   // Transformar em opções para react-select
   const options = useMemo(
     () => municipios.map(m => ({
-      value: m.id || m.codigo || m.nome,
+      value: String(m.id || m.codigo || m.nome), // ✅ FORÇA STRING
       label: m.nome,
       municipio: m // Manter objeto completo para acesso
     })),
