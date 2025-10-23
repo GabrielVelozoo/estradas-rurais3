@@ -335,19 +335,20 @@ export default function EstradasRurais() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, []);
+  }, [fetchData]);
 
   useEffect(() => {
     if (autoRefresh) {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      intervalRef.current = setInterval(() => fetchData(), Math.max(5, refreshIntervalSeconds) * 1000);
+      // Force fresh data on auto-refresh
+      intervalRef.current = setInterval(() => fetchData(true), Math.max(5, refreshIntervalSeconds) * 1000);
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current);
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [autoRefresh, refreshIntervalSeconds]);
+  }, [autoRefresh, refreshIntervalSeconds, fetchData]);
 
   function parseCurrencyToNumber(value) {
     if (!value && value !== 0) return 0;
