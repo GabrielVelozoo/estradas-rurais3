@@ -1,17 +1,33 @@
 import "./App.css";
+import React, { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import { DataCacheProvider } from "./contexts/DataCacheContext";
+
+// Componentes essenciais carregados imediatamente
 import Home from "./components/Home";
-import EstradasRurais from "./components/EstradasRurais";
-import PedidosMaquinarios from "./components/PedidosMaquinarios";
-import PedidosLiderancas from "./components/PedidosLiderancas";
-import PedidosLiderancasV2 from "./components/PedidosLiderancasV2";
-import PedidosMaquinariosV2 from "./components/PedidosMaquinariosV2";
-import Municipios from "./components/Municipios";
 import Navbar from "./components/Navbar";
-import AdminPanel from "./components/AdminPanel";
 import Login from "./components/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
+
+// Lazy loading para componentes pesados
+const EstradasRurais = lazy(() => import("./components/EstradasRurais"));
+const PedidosLiderancasV2 = lazy(() => import("./components/PedidosLiderancasV2"));
+const PedidosMaquinariosV2 = lazy(() => import("./components/PedidosMaquinariosV2"));
+const AdminPanel = lazy(() => import("./components/AdminPanel"));
+const Municipios = lazy(() => import("./components/Municipios"));
+const PedidosMaquinarios = lazy(() => import("./components/PedidosMaquinarios"));
+const PedidosLiderancas = lazy(() => import("./components/PedidosLiderancas"));
+
+// Componente de loading
+const LoadingFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="text-center">
+      <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mb-4"></div>
+      <p className="text-gray-600 font-medium">Carregando...</p>
+    </div>
+  </div>
+);
 
 /* Componentes de redirecionamento removidos - restaurando navegação normal */
 
