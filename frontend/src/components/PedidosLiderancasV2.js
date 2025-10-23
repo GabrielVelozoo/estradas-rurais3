@@ -89,71 +89,57 @@ export default function PedidosLiderancasV2() {
 
   // Carregar pedidos com cache
   const fetchPedidos = useCallback(async (forceFresh = false) => {
-    const maxRetries = 3;
-    const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Backoff exponencial
-    
-    // Cancelar requisição anterior se existir
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    
-    // Criar novo AbortController
-    abortControllerRef.current = new AbortController();
-    
     setCarregando(true);
     setErro(null);
     
     try {
-      const response = await fetch(`${BACKEND_URL}/api/liderancas`, {
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        signal: abortControllerRef.current.signal
-      });
+      const data = await fetchWithCache(
+        'liderancas', 
+        async (signal) => {
+          const response = await fetch(`${BACKEND_URL}/api/liderancas`, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            signal
+          });
 
-      if (response.status === 401) {
+          if (response.status === 401) {
+            throw new Error('AUTH_ERROR');
+          }
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const json = await response.json();
+          
+          if (!Array.isArray(json)) {
+            throw new Error('Invalid data format');
+          }
+
+          return json;
+        },
+        { forceFresh }
+      );
+
+      setPedidos(data);
+      setCarregando(false);
+    } catch (error) {
+      if (error.message === 'AUTH_ERROR') {
         setErro('Sessão expirada. Por favor, faça login novamente.');
         setTimeout(() => window.location.href = '/', 2000);
         return;
       }
 
-      // Retry automático para erros 50x
-      if (response.status >= 500 && response.status < 600 && retryCount < maxRetries) {
-        console.warn(`Erro ${response.status}, tentando novamente (${retryCount + 1}/${maxRetries})...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        return fetchPedidos(retryCount + 1);
-      }
-
-      if (!response.ok) {
-        throw new Error(`Erro ao carregar pedidos (status ${response.status})`);
-      }
-
-      const data = await response.json();
-      
-      if (!Array.isArray(data)) {
-        throw new Error('Formato de dados inválido');
-      }
-
-      setPedidos(data);
-      setCarregando(false);
-    } catch (error) {
-      // Ignorar erros de abort (troca de aba)
       if (error.name === 'AbortError') {
-        console.log('Requisição cancelada (troca de aba)');
+        console.log('[Lideranças] Requisição cancelada');
         return;
       }
       
-      // Retry automático para erros de rede
-      if (retryCount < maxRetries && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
-        console.warn(`Erro de rede, tentando novamente (${retryCount + 1}/${maxRetries})...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        return fetchPedidos(retryCount + 1);
-      }
-      
-      console.error('Erro ao carregar pedidos:', error);
-      setErro(error.message);
+      console.error('[Lideranças] Erro ao carregar:', error);
+      setErro('Erro ao carregar pedidos. Tente novamente.');
       setCarregando(false);
     }
-  };
+  }, [fetchWithCache]);
 
   // Carregar municípios
   const fetchMunicipios = async () => {
