@@ -283,11 +283,24 @@ export default function PedidosLiderancasV2() {
       
       const method = editingId ? 'PUT' : 'POST';
 
+      // ✅ Garantir que municipio_id é string
+      const payload = {
+        ...formData,
+        municipio_id: String(formData.municipio_id),
+        municipio_nome: formData.municipio_nome,
+        lideranca_nome: formData.lideranca_nome,
+        titulo: formData.titulo || '',
+        protocolo: formData.protocolo || '',
+        lideranca_telefone: formData.lideranca_telefone || '',
+        descricao: formData.descricao || '',
+        status: formData.status || null
+      };
+
       const response = await fetch(url, {
         method,
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
