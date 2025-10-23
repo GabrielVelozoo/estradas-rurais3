@@ -360,11 +360,27 @@ export default function PedidosMaquinariosV2() {
       
       const method = editingId ? 'PUT' : 'POST';
 
+      // ✅ Garantir que todos os campos são do tipo correto
+      const payload = {
+        municipio_id: String(formData.municipio_id),
+        municipio_nome: formData.municipio_nome,
+        lideranca_nome: formData.lideranca_nome || '',
+        status: formData.status || null,
+        itens: formData.itens.map(item => ({
+          equipamento: item.equipamento,
+          preco_unitario: Number(item.preco_unitario),
+          quantidade: Number(item.quantidade),
+          observacao: item.observacao || '',
+          subtotal: Number(item.subtotal)
+        })),
+        valor_total: Number(formData.valor_total)
+      };
+
       const response = await fetch(url, {
         method,
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
