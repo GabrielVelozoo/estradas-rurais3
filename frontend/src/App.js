@@ -35,9 +35,11 @@ function App() {
   return (
     <div className="App">
       <BrowserRouter>
-        <AuthProvider>
-          <Navbar />
-          <Routes>
+        <DataCacheProvider>
+          <AuthProvider>
+            <Suspense fallback={<LoadingFallback />}>
+              <Navbar />
+              <Routes>
             {/* Página inicial - Home com cartões */}
             <Route 
               path="/" 
