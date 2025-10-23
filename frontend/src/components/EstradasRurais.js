@@ -577,7 +577,7 @@ export default function EstradasRurais() {
             </div>
             <div className="flex gap-3">
               <button 
-                onClick={() => fetchData()} 
+                onClick={() => fetchData(true)} 
                 className="px-4 py-2 rounded-lg bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
               >
                 🔄 Atualizar
