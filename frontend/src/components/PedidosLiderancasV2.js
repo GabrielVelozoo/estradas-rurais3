@@ -174,7 +174,6 @@ export default function PedidosLiderancasV2() {
 
   useEffect(() => {
     fetchPedidos();
-    fetchMunicipios();
     
     // Cleanup: cancelar requisições ao desmontar
     return () => {
