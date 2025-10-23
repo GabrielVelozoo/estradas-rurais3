@@ -171,6 +171,13 @@ export default function PedidosMaquinariosV2() {
     fetchCatalogo();
     fetchPedidos();
     fetchMunicipios();
+    
+    // Cleanup: cancelar requisições ao desmontar
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, []);
 
   // Calcular cards do dashboard
