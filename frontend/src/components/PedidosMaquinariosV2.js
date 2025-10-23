@@ -762,24 +762,18 @@ export default function PedidosMaquinariosV2() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Município <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <MunicipioSelect
                     value={formData.municipio_id}
-                    onChange={(e) => {
-                      const mun = municipios.find(m => m.id === e.target.value);
+                    onChange={(value, municipio) => {
                       setFormData({
                         ...formData,
-                        municipio_id: e.target.value,
-                        municipio_nome: mun ? mun.nome : ''
+                        municipio_id: value,
+                        municipio_nome: municipio ? municipio.nome : ''
                       });
                     }}
+                    placeholder="Digite para buscar município..."
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="">Selecione um município</option>
-                    {municipios.map(m => (
-                      <option key={m.id} value={m.id}>{m.nome}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 {/* Liderança (opcional) */}
