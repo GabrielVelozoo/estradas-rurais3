@@ -148,29 +148,9 @@ export default function PedidosMaquinariosV2() {
     }
   };
 
-  // Carregar municípios
-  const fetchMunicipios = async () => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/municipios`, {
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          setMunicipios(data);
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao carregar municípios:', error);
-    }
-  };
-
   useEffect(() => {
     fetchCatalogo();
     fetchPedidos();
-    fetchMunicipios();
     
     // Cleanup: cancelar requisições ao desmontar
     return () => {
