@@ -77,20 +77,43 @@ export default function PedidosMaquinariosV2() {
     }
   };
 
-  // Carregar pedidos
-  const fetchPedidos = async () => {
+  // AbortController para cancelar requisições
+  const abortControllerRef = React.useRef(null);
+
+  // Carregar pedidos com retry automático e AbortController
+  const fetchPedidos = async (retryCount = 0) => {
+    const maxRetries = 3;
+    const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Backoff exponencial
+    
+    // Cancelar requisição anterior se existir
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Criar novo AbortController
+    abortControllerRef.current = new AbortController();
+    
     setCarregando(true);
     setErro(null);
+    
     try {
       const response = await fetch(`${BACKEND_URL}/api/pedidos-maquinarios`, {
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        signal: abortControllerRef.current.signal
       });
 
       if (response.status === 401) {
         setErro('Sessão expirada. Por favor, faça login novamente.');
         setTimeout(() => window.location.href = '/', 2000);
         return;
+      }
+
+      // Retry automático para erros 50x
+      if (response.status >= 500 && response.status < 600 && retryCount < maxRetries) {
+        console.warn(`Erro ${response.status}, tentando novamente (${retryCount + 1}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return fetchPedidos(retryCount + 1);
       }
 
       if (!response.ok) {
@@ -104,10 +127,23 @@ export default function PedidosMaquinariosV2() {
       }
 
       setPedidos(data);
+      setCarregando(false);
     } catch (error) {
+      // Ignorar erros de abort (troca de aba)
+      if (error.name === 'AbortError') {
+        console.log('Requisição cancelada (troca de aba)');
+        return;
+      }
+      
+      // Retry automático para erros de rede
+      if (retryCount < maxRetries && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+        console.warn(`Erro de rede, tentando novamente (${retryCount + 1}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return fetchPedidos(retryCount + 1);
+      }
+      
       console.error('Erro ao carregar pedidos:', error);
       setErro(error.message);
-    } finally {
       setCarregando(false);
     }
   };
