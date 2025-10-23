@@ -15,6 +15,9 @@ const STATUS_OPTIONS = [
 ];
 
 export default function PedidosMaquinariosV2() {
+  // Hook de cache
+  const { fetchWithCache } = useDataCache();
+  
   // Estados principais
   const [pedidos, setPedidos] = useState([]);
   const [catalogoEquipamentos, setCatalogoEquipamentos] = useState([]);
