@@ -55,31 +55,43 @@ export default function PedidosMaquinariosV2() {
       .trim();
   };
 
-  // Carregar catálogo de equipamentos
-  const fetchCatalogo = async () => {
+  // Carregar catálogo de equipamentos com cache
+  const fetchCatalogo = useCallback(async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/pedidos-maquinarios/catalogo`, {
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.equipamentos && Array.isArray(data.equipamentos)) {
-          setCatalogoEquipamentos(data.equipamentos);
-          
-          // Criar mapa nome -> preço para lookup rápido
-          const map = {};
-          data.equipamentos.forEach(eq => {
-            map[eq.nome] = eq.preco;
+      const data = await fetchWithCache(
+        'maquinarios-catalogo',
+        async (signal) => {
+          const response = await fetch(`${BACKEND_URL}/api/pedidos-maquinarios/catalogo`, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            signal
           });
-          setCatalogoMap(map);
-        }
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          return await response.json();
+        },
+        { ttl: 10 * 60 * 1000 } // Cache por 10 minutos (catálogo muda raramente)
+      );
+
+      if (data.equipamentos && Array.isArray(data.equipamentos)) {
+        setCatalogoEquipamentos(data.equipamentos);
+        
+        // Criar mapa nome -> preço para lookup rápido
+        const map = {};
+        data.equipamentos.forEach(eq => {
+          map[eq.nome] = eq.preco;
+        });
+        setCatalogoMap(map);
       }
     } catch (error) {
-      console.error('Erro ao carregar catálogo:', error);
+      if (error.name !== 'AbortError') {
+        console.error('Erro ao carregar catálogo:', error);
+      }
     }
-  };
+  }, [fetchWithCache]);
 
   // AbortController para cancelar requisições
   const abortControllerRef = React.useRef(null);
