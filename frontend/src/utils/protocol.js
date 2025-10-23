@@ -1,58 +1,49 @@
-// utils/protocol.js
-// Utilitários para manipulação de protocolos
+// frontend/src/utils/protocol.js
 
-/**
- * Remove pontos, traços e espaços de um protocolo
- * @param {string} protocolo - Protocolo formatado (ex: "24.118.797-7")
- * @returns {string} - Protocolo limpo (ex: "241187977")
- */
-export function cleanProtocol(protocolo) {
-  if (!protocolo) return '';
-  return protocolo.replace(/[.\-\s]/g, '');
+/** Mantém só dígitos */
+export function digitsOnly(value = "") {
+  return String(value).replace(/\D/g, "");
 }
 
-/**
- * Valida se o protocolo tem exatamente 9 dígitos
- * @param {string} protocolo - Protocolo (formatado ou não)
- * @returns {boolean} - true se válido (9 dígitos)
- */
-export function isValidProtocol(protocolo) {
-  if (!protocolo) return false;
-  const cleaned = cleanProtocol(protocolo);
-  return /^\d{9}$/.test(cleaned);
+/** Máscara 00.000.000-0  (também exportada como formatProtocol p/ compatibilidade) */
+export function maskProtocol(input = "") {
+  const d = digitsOnly(input).slice(0, 9);
+  if (d.length <= 2) return d;
+  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
+  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}-${d.slice(8)}`;
 }
 
-/**
- * Monta a URL completa para consulta do protocolo
- * @param {string} protocolo - Protocolo (formatado ou não)
- * @param {string} baseUrl - URL base (opcional, usa env se não informado)
- * @returns {string|null} - URL completa ou null se protocolo inválido
- */
-export function getProtocolUrl(protocolo, baseUrl = null) {
-  if (!isValidProtocol(protocolo)) {
-    return null;
-  }
+/** Alias por compatibilidade com imports existentes */
+export const formatProtocol = maskProtocol;
 
-  const cleaned = cleanProtocol(protocolo);
-  const base = baseUrl || process.env.REACT_APP_PROTOCOL_BASE_URL || 'https://rural-infra-hub.emergent.host';
-  
-  return `${base}/protocolo?numero=${cleaned}`;
+/** Validação simples: protocolo válido tem exatamente 9 dígitos */
+export function isValidProtocol(input = "") {
+  return digitsOnly(input).length === 9;
 }
 
-/**
- * Formata o protocolo no padrão 00.000.000-0
- * @param {string} protocolo - Protocolo (limpo ou formatado)
- * @returns {string} - Protocolo formatado
- */
-export function formatProtocol(protocolo) {
-  if (!protocolo) return '';
-  
-  const cleaned = cleanProtocol(protocolo);
-  
-  if (cleaned.length !== 9) {
-    return protocolo; // Retorna como está se não tiver 9 dígitos
-  }
-  
-  // Formato: 00.000.000-0
-  return `${cleaned.slice(0, 2)}.${cleaned.slice(2, 5)}.${cleaned.slice(5, 8)}-${cleaned.slice(8)}`;
+/** Constrói a URL OFICIAL do eProtocolo PR */
+export function buildProtocolUrl(input = "") {
+  const digits = digitsOnly(input);
+  if (digits.length !== 9) return null;
+
+  return (
+    "https://www.eprotocolo.pr.gov.br/spiweb/consultarProtocoloDigital.do" +
+    "?action=pesquisar&numeroProtocolo=" +
+    digits
+  );
+}
+
+/** Alias para compatibilidade com imports antigos */
+export const getProtocolUrl = buildProtocolUrl;
+
+/** Helper opcional para abrir em nova aba com checagem */
+export function openProtocolInNewTab(input = "") {
+  const url = buildProtocolUrl(input);
+  if (url) window.open(url, "_blank", "noopener,noreferrer");
+}
+
+/** Útil quando precisar garantir só os dígitos */
+export function toProtocolDigits(input = "") {
+  return digitsOnly(input).slice(0, 9);
 }

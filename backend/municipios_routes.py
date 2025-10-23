@@ -1,91 +1,77 @@
-from fastapi import APIRouter, Depends, Query
-from typing import List, Optional
-from motor.motor_asyncio import AsyncIOMotorDatabase
-import json
-import os
+# backend/municipios_routes.py
+from fastapi import APIRouter, HTTPException, Query, status
+from typing import List, Dict, Optional
 from pathlib import Path
+import json
+import unicodedata
+import logging
 
-from auth_middleware import get_current_user
-from auth_routes import get_db
-from auth_models import UserResponse
-
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Carregar municípios do arquivo JSON
-MUNICIPIOS_FILE = Path(__file__).parent / "data" / "municipios_parana.json"
+# Caminho do JSON (mantenha este caminho e nome de arquivo)
+DATA_PATH = Path(__file__).parent / "data" / "municipios_parana.json"
 
-def load_municipios():
-    """Carregar lista de municípios do arquivo JSON"""
-    with open(MUNICIPIOS_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+def _strip_accents(s: str) -> str:
+    """Remove acentos para comparação acento-insensível."""
+    if not isinstance(s, str):
+        return ""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s)
+        if unicodedata.category(c) != "Mn"
+    )
 
-def normalize_text(text: str) -> str:
-    """Remover acentos e converter para minúsculas"""
-    import unicodedata
-    if not text:
-        return ''
-    # Normalização NFD + remoção de diacríticos
-    nfd = unicodedata.normalize('NFD', text)
-    without_accents = ''.join(char for char in nfd if unicodedata.category(char) != 'Mn')
-    return without_accents.lower().strip()
-
-@router.get("/municipios")
-async def list_municipios(
-    search: Optional[str] = Query(None, description="Termo de busca (case/acento-insensível)"),
-    current_user: UserResponse = Depends(get_current_user),
-    db: AsyncIOMotorDatabase = Depends(get_db)
-):
-    """
-    Listar municípios do Paraná com busca acento-insensível
-    
-    - Sem search: retorna todos os 399 municípios
-    - Com search: filtra por nome (case/acento-insensível)
-    """
+def _load_json() -> List[Dict]:
+    """Carrega o JSON do disco e valida formato básico."""
+    if not DATA_PATH.exists():
+        msg = f"Arquivo não encontrado: {DATA_PATH}"
+        logger.error(msg)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg)
     try:
-        # Carregar todos os municípios
-        municipios = load_municipios()
-        
-        # Se não há busca, retornar todos
-        if not search or search.strip() == '':
-            # Buscar números de liderança para cada município
-            municipios_com_numeros = []
-            for municipio in municipios:
-                # Buscar o pedido mais recente para este município
-                pedido = await db.pedidos_liderancas.find_one(
-                    {"lideranca": {"$regex": municipio["nome"], "$options": "i"}},
-                    sort=[("created_at", -1)]
-                )
-                
-                municipios_com_numeros.append({
-                    "id": municipio["id"],
-                    "nome": municipio["nome"],
-                    "numero_lideranca": pedido.get("numero_lideranca", "") if pedido else ""
-                })
-            
-            return municipios_com_numeros
-        
-        # Normalizar termo de busca
-        search_normalized = normalize_text(search)
-        
-        # Filtrar municípios
-        filtered = []
-        for municipio in municipios:
-            nome_normalized = normalize_text(municipio["nome"])
-            if search_normalized in nome_normalized:
-                # Buscar número de liderança
-                pedido = await db.pedidos_liderancas.find_one(
-                    {"lideranca": {"$regex": municipio["nome"], "$options": "i"}},
-                    sort=[("created_at", -1)]
-                )
-                
-                filtered.append({
-                    "id": municipio["id"],
-                    "nome": municipio["nome"],
-                    "numero_lideranca": pedido.get("numero_lideranca", "") if pedido else ""
-                })
-        
-        return filtered
-        
+        with open(DATA_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            raise ValueError("Conteúdo do JSON deve ser uma lista")
+        # Validação rápida dos campos
+        for i, item in enumerate(data):
+            if not isinstance(item, dict) or "id" not in item or "nome" not in item:
+                raise ValueError(f"Item inválido na posição {i}: esperado {{'id', 'nome'}}")
+        return data
+    except json.JSONDecodeError as e:
+        msg = f"JSON inválido em {DATA_PATH}: {e}"
+        logger.error(msg)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg)
     except Exception as e:
-        print(f"Error loading municipios: {e}")
-        return []
+        msg = f"Falha ao ler {DATA_PATH}: {e}"
+        logger.error(msg)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg)
+
+def _filter_by_query(items: List[Dict], q: Optional[str]) -> List[Dict]:
+    if not q:
+        # Ordena por nome por padrão
+        return sorted(items, key=lambda x: x.get("nome", ""))
+    qn = _strip_accents(q).lower().strip()
+    out = []
+    for it in items:
+        nome = it.get("nome", "")
+        if _strip_accents(nome).lower().find(qn) != -1:
+            out.append(it)
+    return sorted(out, key=lambda x: x.get("nome", ""))
+
+@router.get("/municipios", response_model=List[Dict])
+async def get_municipios(q: Optional[str] = Query(None, description="Filtro por nome (acento-insensível)")):
+    """
+    Lista de municípios do PR.
+    - Suporta `?q=` para busca acento-insensível (ex: `?q=sao` encontra 'São ...').
+    """
+    data = _load_json()
+    return _filter_by_query(data, q)
+
+@router.get("/municipios/{municipio_id}", response_model=Dict)
+async def get_municipio_by_id(municipio_id: int):
+    """Obtém um município pelo ID."""
+    data = _load_json()
+    for it in data:
+        if int(it.get("id", -1)) == int(municipio_id):
+            return it
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Município não encontrado")
