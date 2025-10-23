@@ -10,17 +10,17 @@ Resolver erro 500 na página "Pedidos Lideranças" no ambiente de produção (24
 #### 1. Backend - CORS (`/app/backend/.env`)
 **Antes:**
 ```env
-CORS_ORIGINS="http://localhost:3000,https://lideranca-portal.preview.emergentagent.com"
+CORS_ORIGINS="http://localhost:3000,https://rural-connect-12.preview.emergentagent.com"
 ```
 
 **Depois:**
 ```env
-CORS_ORIGINS="http://localhost:3000,https://lideranca-portal.preview.emergentagent.com,https://rural-infra-hub.emergent.host,https://*.preview.emergentagent.com"
+CORS_ORIGINS="http://localhost:3000,https://rural-connect-12.preview.emergentagent.com,https://rural-infra-hub.emergent.host,https://rural-connect-12.preview.emergentagent.com"
 ```
 
 **Mudanças:**
 - ✅ Adicionado domínio de produção: `https://rural-infra-hub.emergent.host`
-- ✅ Adicionado wildcard para previews: `https://*.preview.emergentagent.com`
+- ✅ Adicionado wildcard para previews: `https://rural-connect-12.preview.emergentagent.com`
 
 ---
 
@@ -81,7 +81,7 @@ response.set_cookie(
 #### 4. Frontend - Backend URL (`/app/frontend/.env`)
 **Antes:**
 ```env
-REACT_APP_BACKEND_URL=https://lideranca-portal.preview.emergentagent.com
+REACT_APP_BACKEND_URL=https://rural-connect-12.preview.emergentagent.com
 ```
 
 **Depois:**

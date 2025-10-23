@@ -6,7 +6,7 @@
 **Arquivo:** `/app/backend/.env`
 
 ```env
-CORS_ORIGINS="http://localhost:3000,https://lideranca-portal.preview.emergentagent.com,https://rural-infra-hub.emergent.host,https://*.preview.emergentagent.com"
+CORS_ORIGINS="http://localhost:3000,https://rural-connect-12.preview.emergentagent.com,https://rural-infra-hub.emergent.host,https://rural-connect-12.preview.emergentagent.com"
 ```
 
 O CORS agora aceita:
@@ -60,7 +60,7 @@ Certifique-se que no ambiente de produção (24h):
 
 **Backend:**
 ```bash
-CORS_ORIGINS="https://rural-infra-hub.emergent.host,https://*.preview.emergentagent.com"
+CORS_ORIGINS="https://rural-infra-hub.emergent.host,https://rural-connect-12.preview.emergentagent.com"
 MONGO_URL="mongodb://localhost:27017"
 DB_NAME="test_database"
 JWT_SECRET_KEY="seu-jwt-secret-key-super-secreto-mude-em-producao-2024"

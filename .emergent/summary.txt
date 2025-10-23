@@ -1,113 +1,78 @@
 <analysis>
-The AI engineer successfully implemented the Pedidos Lideranças module, adhering to the user's iterative and evolving requirements. This included developing a full CRUD backend with FastAPI and MongoDB, and a React frontend with dynamic search, protocol masking, clickable e-Protocolo links, a municipality autocomplete dropdown, and basic print functionality. Challenges included refining data models and API responses for robustness, handling specific validation rules (like partial unique indices for protocols), and debugging persistent 500 errors, which often involved meticulous backend log analysis, Pydantic model corrections, and ensuring data consistency. The AI also laid the groundwork for Pedidos de Maquinários backend, but its frontend remains to be updated. A recurring theme was the user reporting a 500 error on Pedidos Lideranças and shared data issues, requiring deep dives into both backend logic and existing MongoDB data. The last interaction involved debugging the 500 error and a rejected usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>]
-           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
-           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]
-           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]
-           [--super-prefix=<path>] [--config-env=<name>=<envvar>]
-           <command> [<args>]
+The AI engineer has significantly evolved the application from its initial state, addressing a wide array of user requirements, from bug fixes to major feature refactoring. Initially, the focus was on resolving a persistent 500 error on the Pedidos Lideranças page, which was traced to frontend authentication handling (401) and later production environment configuration issues (CORS, cookies, ). A critical backend bug involving conflicting V1/V2 API routes and incorrect  type handling was also resolved.
 
-These are common Git commands used in various situations:
-
-start a working area (see also: git help tutorial)
-   clone     Clone a repository into a new directory
-   init      Create an empty Git repository or reinitialize an existing one
-
-work on the current change (see also: git help everyday)
-   add       Add file contents to the index
-   mv        Move or rename a file, a directory, or a symlink
-   restore   Restore working tree files
-   rm        Remove files from the working tree and from the index
-
-examine the history and state (see also: git help revisions)
-   bisect    Use binary search to find the commit that introduced a bug
-   diff      Show changes between commits, commit and working tree, etc
-   grep      Print lines matching a pattern
-   log       Show commit logs
-   show      Show various types of objects
-   status    Show the working tree status
-
-grow, mark and tweak your common history
-   branch    List, create, or delete branches
-   commit    Record changes to the repository
-   merge     Join two or more development histories together
-   rebase    Reapply commits on top of another base tip
-   reset     Reset current HEAD to the specified state
-   switch    Switch branches
-   tag       Create, list, delete or verify a tag object signed with GPG
-
-collaborate (see also: git help workflows)
-   fetch     Download objects and refs from another repository
-   pull      Fetch from and integrate with another repository or a local branch
-   push      Update remote refs along with associated objects
-
-'git help -a' and 'git help -g' list available subcommands and some
-concept guides. See 'git help <command>' or 'git help <concept>'
-to read about a specific subcommand or concept.
-See 'git help git' for an overview of the system. command attempt.
+Subsequently, the AI undertook a major refactoring of both Pedidos Lideranças and Pedidos de Maquinários into V2 modules, implementing new data models, CRUD endpoints, and comprehensive frontend components with enhanced UI, printing, and Excel export. Key enhancements included a cached, type-ahead municipality selector, robust error handling, and a clickable protocol link. The most recent task involves optimizing performance, particularly for the Estradas Rurais module which fetches from Google Sheets, by implementing a global data cache and lazy loading in the frontend. This systematic approach, addressing bugs and then expanding features, defines the trajectory.
 </analysis>
 
 <product_requirements>
-The user initially requested a new tab, Pedidos Lideranças, to mimic the existing Estradas Rurais tab. Key features included:
-- A Novo Pedido form with fields: O que é o pedido (text), Protocolo (unique,  format with mask/validation), Nome da liderança, and Descrição do pedido (optional, long text).
-- A main table displaying Protocolo, Pedido, Liderança, Descrição, and Actions (view/edit/delete).
-- Accent-insensitive search and a Copiar protocolo button.
-- Consistent visual style with Estradas Rurais (title, fixed header, loading skeleton).
+The application's core goal is to manage Pedidos Lideranças and Pedidos de Maquinários with shared data visibility. Initial requirements for Pedidos Lideranças included a new tab with CRUD, search, protocol masking, and print. This evolved to include Número da Liderança, a home page card, a mandatory municipality autocomplete from 399 Paraná municipalities, an optional protocol with partial unique index (later removed, allowing duplicates/empty), clickable e-Protocolo links, and improved error handling.
 
-Subsequent updates added:
-- Número da Liderança field (numeric only) to the form and table, and positioning Pedidos Lideranças menu item to the left of Pedidos de Maquinários.
-- A card for Pedidos Lideranças on the Home page, left of the Pedidos de Maquinários card.
-- A Município field (mandatory select/autocomplete of 399 Paraná municipalities, with instant accent-insensitive search) as the first field in the Novo Pedido modal, saving  and . The separate Municípios tab was explicitly rescinded.
-- Protocolo field to be optional (backend & UI), with a partial unique index, and a clickable e-Protocolo link appearing upon valid 9-digit input.
-- Improved error handling in the frontend ( instead of generic alerts) and robust backend validation/normalization for all fields.
-- Removal of protocol uniqueness requirement (allowing repeated or empty protocols).
-- Número da Liderança to accept any quantity of digits (min 1), normalized to digits only in the backend.
-- Full data persistence (CRUD with MongoDB) for both Pedidos de Lideranças and Pedidos de Maquinários, ensuring shared data visibility for all users.
-- An Imprimir button for both modules, printing only visible table content, with specific print styles and a Ctrl+P shortcut.
-The current problem is a persistent 500 error on the Pedidos Lideranças page.
+A major refactor was requested for both modules (V2):
+**Pedidos de Lideranças V2:**
+- New fields: , ,  (enum), , .
+- UI: Card on Home, Adicionar Pedido form, Imprimir, Exportar Excel buttons.
+- Filters: general search, by municipality, leadership, status.
+- Table: Protocolo, Título, Município, Liderança, Telefone, Status, Criado em, Ações.
+- Rules: Municipality and leadership mandatory; others optional. Accent-insensitive search,  DESC ordering.
+**Pedidos de Maquinários V2:**
+- UI: Dashboard cards (Municípios, Pedidos, Equipamentos, Valor Total).
+- Form: Municipality (mandatory), Leadership (optional), multiple Itens de pedido (Equipment, Quantity, Observation).
+- Equipment catalog with fixed prices, auto-calculated , , .
+- Filters: general search, by status, by municipality.
+- Table: Município, Liderança, Qtd de Itens, Valor Total, Status, Criado em, Ações.
+**Transversal Requirements:** Data visible to all users (no  filter), CORS/cookies for production,  for frontend fetches, print/export respect filters, UX clean and responsive.
+Recent requests include: standardizing home page card sizes/colors, adjusting Estradas Rurais print layout, removing Made with Emergent seal, fixing dict object has no attribute dict error in Maquinários V2 update, correcting data display in Maquinários V2 list, ensuring  is a string, and adding clickable protocol links. The most recent ongoing request is to optimize page loading and tab switching performance, particularly for Estradas Rurais.
 </product_requirements>
 
 <key_technical_concepts>
-- **Full-stack Architecture**: React frontend, FastAPI backend, MongoDB database.
-- **Data Modeling**: Pydantic for API schemas, MongoDB collections.
-- **Backend Features**: CRUD operations, partial unique indexing, data normalization (, ), environment variable usage.
-- **Frontend Features**: React components, dynamic routing, Tailwind CSS, form validation, autocomplete, accent-insensitive search, protocol masking, external link generation, print styling (), structured error handling ().
-- **Deployment & Monitoring**: Supervisor for service management, health checks, environment variable management.
+- **Full-stack Architecture**: React.js frontend, FastAPI backend, MongoDB database.
+- **Data Handling**: Pydantic for API schemas, Motor for async MongoDB.
+- **Frontend State Management**: React Context API, , , .
+- **UI/UX**:  for autocomplete,  for notifications,  for Excel export.
+- **API Communication**:  with ,  for request cancellation.
+- **Deployment**: Supervisor for service management, Kubernetes ingress rules, CORS.
 </key_technical_concepts>
 
 <code_architecture>
-The application follows a standard full-stack architecture:
 
 
-- ****: Defines Pydantic schemas for Pedidos Lideranças (base, create, update, response). Key changes: added , , ;  made optional and validated with regex;  field now defaults to  instead of  in the Pydantic validator to prevent frontend errors.
-- ****: Implements CRUD endpoints for Pedidos Lideranças. Key changes:  no longer filters by ;  function added to ensure all fields are present and correctly formatted before  parsing;  validation adjusted for optionality;  validation for any digit quantity.
-- ****: Created to define Pydantic schemas for Pedidos de Maquinários.
-- ****: Created to implement CRUD endpoints for Pedidos de Maquinários. Key changes:  added for data consistency.
-- ****: Created to provide an API for municipality data, now primarily used as a data source for the Pedidos Lideranças form.
-- ****: Integrates the new , , and .
-- ****: Stores the list of 399 municipalities used by the backend and frontend.
-- ****: A utility script to create a MongoDB partial unique index on  (only when not empty).
-- ****: A utility script to remove the unique index on , fulfilling a user request.
-- ****: Manages routing and includes  and (formerly)  components.
-- ****: Updated to include Pedidos Lideranças (positioned left of Pedidos de Maquinários) and previously Municípios (later removed).
-- ****: Modified to include a Pedidos Lideranças card.
-- ****: Extensively modified to include: Município autocomplete, Número da Liderança, dynamic search, masked optional Protocolo with e-Protocolo link, improved error handling (), and an Imprimir button. This is the most complex and frequently changed frontend component.
-- ****: Created but effectively deactivated/removed from the navigation, as the functionality was absorbed into Pedidos Lideranças.
-- ****: Created to provide a consistent header for printed pages.
-- ****: Updated with  styles to control print layout (hide non-essential elements, adjust table appearance, handle page breaks).
-- ****: Updated to include Google Sheets API keys, addressing a security concern from the health check.
+-   ****: Defines Pydantic schemas for the new Pedidos Lideranças V2 (base, create, update, response) including  (coerced to string), , , , , , .
+-   ****: Implements CRUD endpoints for Pedidos Lideranças V2, without  filtering. Handles validation for optional fields like  and .
+-   ****: Defines Pydantic schemas for Pedidos de Maquinários V2, including nested  for equipment, , , and  (coerced to string). Contains  for price validation.
+-   ****: Implements CRUD endpoints for Pedidos de Maquinários V2. Corrected  application on items during update. Includes logic for calculating  and  and validating equipment prices against the catalog.
+-   ****: Central FastAPI application. Now includes  and , explicitly disabling old V1 routes to prevent conflicts. Configures CORS middleware for production and preview domains, and creates MongoDB indexes for V2 collections.
+-   ****: Manages routing. Updated to include V2 routes for  and . Recently updated to include  and  for performance.
+-   ****: Displays cards for different modules. Modified to standardize card sizes/colors and include V2 module cards at the top.
+-   ****: Updated to include navigation links for V2 modules.
+-   ****: The new complex component for Pedidos Lideranças V2. Includes , dynamic search, masked optional Protocolo with clickable link, improved error handling (), Imprimir and Exportar Excel functionalities. Enhanced with  and error retries for stability.
+-   ****: The new component for Pedidos de Maquinários V2. Features dashboard cards, a form with multiple equipment items, auto-calculation of subtotals/total, filtering, redesigned display using cards for items, and /. Enhanced with  and error retries.
+-   ****: The existing component for Estradas Rurais. Modified print functionality to remove Prefeito column, map Descrição to Nome da Estrada, and Situação to original.
+-   ****: Reusable component using  for municipality selection with type-ahead and local caching. Ensures  is passed as a string.
+-   ****: Reusable component to render a clickable protocol link based on validity.
+-   ****: New React Context to provide a global cache for fetched data, particularly for optimizing data loading across pages.
+-   ****: Custom hook to fetch municipality data once and cache it in  for performance.
+-   ****: Utility for accent-insensitive text normalization used in search and filtering.
+-   ****: Utility for formatting protocol numbers and constructing their clickable URLs.
+-   ****: Stores  and  (recently corrected to production URLs).
 </code_architecture>
 
 <pending_tasks>
-- Update the frontend component  to use the new backend CRUD routes (currently still uses local storage) and incorporate the Imprimir functionality.
-- Further investigate and resolve the persistent 500 error on the Pedidos Lideranças page that the user is currently reporting.
+- Optimize  and  to utilize the new  for performance.
+- Ensure the  and lazy loading fully resolve the reported slowdowns and intermittent crashes when switching between tabs.
+- Validate backend timeouts and log behavior for the performance issue.
 </pending_tasks>
 
 <current_work>
-Immediately before this summary request, the AI engineer was debugging a recurring Erro 500 ao carregar pedidos on the Pedidos Lideranças page, as reported by the user. The AI had previously addressed the root cause of 500 errors related to  and  filters in the backend. The API endpoint  was confirmed to be returning  with valid data when tested directly. The AI also confirmed that the backend  routes no longer filter by , meaning data sharing is correctly configured from the backend perspective; observed discrepancies in data visibility for different users were attributed to how the data was initially created, not a backend filter.
+Immediately before this summary request, the AI engineer was addressing user-reported issues regarding slow page loading, general sluggishness, and temporary unresponsiveness when navigating between tabs, particularly impacting the Estradas Rurais page. The Estradas Rurais component was identified as fetching data directly from Google Sheets, which is a slow operation.
 
-The AI's most recent diagnostic indicates the 500 error is likely a frontend issue, possibly related to session management, intermittent network problems, or how the frontend processes the data, rather than a backend fault (as the backend correctly returns  for authentication failures, not ). The user then provided a screenshot showing a WebSocket Error (a development-related, non-critical issue) alongside the Erro 500. The AI's last action was to attempt a  and  for a fix related to the WebSocket error, which was rejected by the system because  commands are not allowed directly. The AI's focus remains on investigating the  function in  to understand why the frontend is failing to process the data from the (seemingly working) backend.
+To tackle this, the AI initiated a comprehensive performance optimization plan:
+1.  **Created **: This new React Context is designed to provide a global caching mechanism for data fetched from the backend.
+2.  **Updated **:
+    *   Wrapped the application's routes within the new  to make the cache available globally.
+    *   Implemented  for components like , , and  to enable code splitting and lazy loading, improving initial load times.
+3.  **Started optimizing **: The AI has begun modifying this component to integrate with the , aiming to store and retrieve data from the cache instead of refetching on every render or tab switch.
 </current_work>
 
 <optional_next_step>
-Investigate the  function in  to identify the cause of the Erro 500.
+Continue optimizing  and  to utilize the new .
 </optional_next_step>
