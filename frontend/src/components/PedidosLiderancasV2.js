@@ -175,6 +175,13 @@ export default function PedidosLiderancasV2() {
   useEffect(() => {
     fetchPedidos();
     fetchMunicipios();
+    
+    // Cleanup: cancelar requisições ao desmontar
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, []);
 
   // Filtrar pedidos (acento-insensível)
