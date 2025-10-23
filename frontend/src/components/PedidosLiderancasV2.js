@@ -87,11 +87,8 @@ export default function PedidosLiderancasV2() {
     }
   };
 
-  // AbortController para cancelar requisições
-  const abortControllerRef = React.useRef(null);
-
-  // Carregar pedidos com retry automático e AbortController
-  const fetchPedidos = async (retryCount = 0) => {
+  // Carregar pedidos com cache
+  const fetchPedidos = useCallback(async (forceFresh = false) => {
     const maxRetries = 3;
     const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Backoff exponencial
     
