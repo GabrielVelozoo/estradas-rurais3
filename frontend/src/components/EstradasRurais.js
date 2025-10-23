@@ -128,6 +128,9 @@ const TabelaLinha = ({ r, i }) => {
 };
 
 export default function EstradasRurais() {
+  // Hook de cache
+  const { fetchWithCache, clearCache } = useDataCache();
+  
   // Função para normalizar texto (remover acentos)
   const normalizeText = (text) => {
     if (!text) return '';
