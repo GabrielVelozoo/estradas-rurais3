@@ -207,20 +207,33 @@ export default function EstradasRurais() {
   const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState(60);
   const intervalRef = useRef(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async (forceFresh = false) => {
     setCarregando(true);
     setErro(null);
+    
     try {
-      // Usar backend como proxy para evitar problemas de CORS
       const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-      const res = await fetch(`${BACKEND_URL}/api/estradas-rurais`);
-      if (!res.ok) throw new Error(`Erro na requisição: ${res.status} ${res.statusText}`);
-      const data = await res.json();
+      
+      // Usar cache para dados do Google Sheets (slow operation)
+      const data = await fetchWithCache(
+        'estradas-rurais',
+        async (signal) => {
+          const res = await fetch(`${BACKEND_URL}/api/estradas-rurais`, { signal });
+          if (!res.ok) throw new Error(`Erro na requisição: ${res.status} ${res.statusText}`);
+          return await res.json();
+        },
+        { 
+          forceFresh,
+          ttl: 3 * 60 * 1000 // Cache por 3 minutos (dados mudam com menos frequência)
+        }
+      );
+      
       if (!data.values) {
         setDados([]);
         setErro("Planilha retornou sem valores (data.values está vazio). Verifique permissões e intervalo A:F");
         return;
       }
+      
       // ✅ 2) Detectar automaticamente qual é a coluna de prioridade
       const header = data.values[0].map(h => (h || '').toString().trim().toLowerCase());
       let priIndex = header.findIndex(h => h.includes('priorid') || h.includes('priorit'));
@@ -304,13 +317,18 @@ export default function EstradasRurais() {
       const rows = allRows;
       console.log('total prioridades finais:', rows.filter(r => r.isPrioridade).length);
       setDados(rows);
+      setCarregando(false);
     } catch (e) {
+      if (e.name === 'AbortError') {
+        console.log('[Estradas Rurais] Requisição cancelada');
+        return;
+      }
+      
       console.error(e);
       setErro(e.message || String(e));
-    } finally {
       setCarregando(false);
     }
-  };
+  }, [fetchWithCache]);
 
   useEffect(() => {
     fetchData();
