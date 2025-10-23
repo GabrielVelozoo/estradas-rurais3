@@ -146,9 +146,6 @@ export default function PedidosMaquinariosV2() {
       setCarregando(false);
     }
   }, [fetchWithCache]);
-      setCarregando(false);
-    }
-  };
 
   useEffect(() => {
     fetchCatalogo();
