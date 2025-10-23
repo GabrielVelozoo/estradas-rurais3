@@ -153,14 +153,7 @@ export default function PedidosMaquinariosV2() {
   useEffect(() => {
     fetchCatalogo();
     fetchPedidos();
-    
-    // Cleanup: cancelar requisições ao desmontar
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
+  }, [fetchCatalogo, fetchPedidos]);
 
   // Calcular cards do dashboard
   const dashboardStats = useMemo(() => {
