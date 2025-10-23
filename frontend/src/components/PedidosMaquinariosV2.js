@@ -660,81 +660,109 @@ export default function PedidosMaquinariosV2() {
           </div>
         )}
 
-        {/* Tabela */}
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+        {/* Cards de Pedidos */}
+        <div className="space-y-6">
           {pedidosFiltrados.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
+            <div className="bg-white rounded-lg shadow-lg p-12 text-center text-gray-500">
               {buscaGeral || filtroMunicipio || filtroStatus
                 ? '🔍 Nenhum pedido encontrado com esses critérios'
                 : '🚜 Nenhum pedido cadastrado ainda'}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gradient-to-r from-green-600 to-green-700 text-white">
-                  <tr>
-                    <th className="px-6 py-4 text-left font-semibold">Município</th>
-                    <th className="px-6 py-4 text-left font-semibold">Liderança</th>
-                    <th className="px-6 py-4 text-center font-semibold">Qtd Itens</th>
-                    <th className="px-6 py-4 text-right font-semibold">Valor Total</th>
-                    <th className="px-6 py-4 text-left font-semibold">Status</th>
-                    <th className="px-6 py-4 text-left font-semibold">Criado em</th>
-                    <th className="px-6 py-4 text-center font-semibold no-print">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pedidosFiltrados.map((pedido, index) => (
-                    <tr
-                      key={pedido.id}
-                      className={`border-b border-gray-100 hover:bg-green-50 transition-colors ${
-                        index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                      }`}
-                    >
-                      <td className="px-6 py-4 font-medium">{pedido.municipio_nome}</td>
-                      <td className="px-6 py-4">{pedido.lideranca_nome || '-'}</td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                          {pedido.itens?.length || 0}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right font-bold text-green-700">
-                        {formatCurrency(pedido.valor_total)}
-                      </td>
-                      <td className="px-6 py-4">
+            pedidosFiltrados.map((pedido) => (
+              <div key={pedido.id} className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+                {/* Header do Card */}
+                <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-6">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-2xl font-bold">{pedido.municipio_nome || 'Município não informado'}</h3>
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          pedido.status === 'atendido' ? 'bg-green-100 text-green-800' :
-                          pedido.status === 'em_andamento' ? 'bg-blue-100 text-blue-800' :
-                          pedido.status === 'aguardando_atendimento' ? 'bg-yellow-100 text-yellow-800' :
-                          pedido.status === 'arquivado' ? 'bg-gray-100 text-gray-800' :
-                          'bg-gray-100 text-gray-600'
+                          pedido.status === 'atendido' ? 'bg-green-200 text-green-900' :
+                          pedido.status === 'em_andamento' ? 'bg-blue-200 text-blue-900' :
+                          pedido.status === 'aguardando_atendimento' ? 'bg-yellow-200 text-yellow-900' :
+                          pedido.status === 'arquivado' ? 'bg-gray-200 text-gray-900' :
+                          'bg-white/20'
                         }`}>
                           {formatStatus(pedido.status)}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {new Date(pedido.created_at).toLocaleDateString('pt-BR')}
-                      </td>
-                      <td className="px-6 py-4 no-print">
-                        <div className="flex gap-2 justify-center">
-                          <button
-                            onClick={() => openModal(pedido)}
-                            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleDelete(pedido.id)}
-                            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
-                          >
-                            Excluir
-                          </button>
+                      </div>
+                      {pedido.lideranca_nome && (
+                        <p className="text-green-100 text-sm">
+                          👤 Liderança: <span className="font-medium">{pedido.lideranca_nome}</span>
+                        </p>
+                      )}
+                      <p className="text-green-100 text-xs mt-1">
+                        📅 Criado em: {new Date(pedido.created_at).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    
+                    <div className="text-right">
+                      <p className="text-green-100 text-sm mb-1">Valor Total</p>
+                      <p className="text-3xl font-bold">{formatCurrency(pedido.valor_total)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Corpo do Card - Equipamentos */}
+                <div className="p-6">
+                  <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <span>🚜</span>
+                    <span>Equipamentos Solicitados ({pedido.itens?.length || 0})</span>
+                  </h4>
+                  
+                  {pedido.itens && pedido.itens.length > 0 ? (
+                    <div className="space-y-3">
+                      {pedido.itens.map((item, idx) => (
+                        <div key={idx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <h5 className="font-semibold text-gray-900 mb-1">
+                                {item.equipamento || 'Equipamento não especificado'}
+                              </h5>
+                              {item.observacao && (
+                                <p className="text-sm text-gray-600 mt-1">
+                                  📝 {item.observacao}
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right ml-4">
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Qtd:</span> {item.quantidade || 0}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Unit:</span> {formatCurrency(item.preco_unitario || 0)}
+                              </div>
+                              <div className="text-lg font-bold text-green-700 mt-1">
+                                {formatCurrency(item.subtotal || 0)}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">Nenhum equipamento adicionado</p>
+                  )}
+                </div>
+
+                {/* Footer do Card - Ações */}
+                <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 no-print">
+                  <button
+                    onClick={() => openModal(pedido)}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                  >
+                    ✏️ Editar
+                  </button>
+                  <button
+                    onClick={() => handleDelete(pedido.id)}
+                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
+                  >
+                    🗑️ Excluir
+                  </button>
+                </div>
+              </div>
+            ))
           )}
         </div>
       </div>
