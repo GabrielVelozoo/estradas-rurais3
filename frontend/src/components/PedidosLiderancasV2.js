@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import PrintHeader from './PrintHeader';
 import MunicipioSelect from './MunicipioSelect';
+import ProtocolLink from './ProtocolLink';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
