@@ -16,7 +16,6 @@ const STATUS_OPTIONS = [
 export default function PedidosLiderancasV2() {
   // Estados principais
   const [pedidos, setPedidos] = useState([]);
-  const [municipios, setMunicipios] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   
