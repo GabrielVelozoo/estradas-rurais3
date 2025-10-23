@@ -16,7 +16,6 @@ const STATUS_OPTIONS = [
 export default function PedidosMaquinariosV2() {
   // Estados principais
   const [pedidos, setPedidos] = useState([]);
-  const [municipios, setMunicipios] = useState([]);
   const [catalogoEquipamentos, setCatalogoEquipamentos] = useState([]);
   const [catalogoMap, setCatalogoMap] = useState({});
   const [carregando, setCarregando] = useState(true);
