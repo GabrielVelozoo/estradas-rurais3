@@ -238,9 +238,47 @@ export default function PedidosLiderancasV2() {
       console.error('Erro ao filtrar pedidos:', error);
       return [];
     }
-  }, [pedidos, buscaGeral, filtroMunicipio, filtroLideranca, filtroStatus]);
+  }, [pedidos, buscaGeralDebounced, filtroMunicipio, filtroLideranca, filtroStatus]);
+  
+  // Ordenar pedidos (mais recente primeiro)
+  const pedidosOrdenados = useMemo(() => {
+    return [...pedidosFiltrados].sort((a, b) => {
+      const dateA = new Date(a.created_at || 0);
+      const dateB = new Date(b.created_at || 0);
+      return dateB - dateA; // Mais recente primeiro
+    });
+  }, [pedidosFiltrados]);
+  
+  // Paginação
+  const totalPaginas = Math.ceil(pedidosOrdenados.length / itensPorPagina);
+  const indexInicio = (paginaAtual - 1) * itensPorPagina;
+  const indexFim = indexInicio + itensPorPagina;
+  const pedidosPaginados = pedidosOrdenados.slice(indexInicio, indexFim);
+  
+  // Funções para navegação de página
+  const irParaPagina = (pagina) => {
+    setPaginaAtual(Math.max(1, Math.min(pagina, totalPaginas)));
+  };
+  
+  // Abrir modal de detalhes
+  const openDetailsModal = (pedido) => {
+    setSelectedPedido(pedido);
+    setShowDetailsModal(true);
+  };
+  
+  // Fechar modal de detalhes
+  const closeDetailsModal = () => {
+    setShowDetailsModal(false);
+    setSelectedPedido(null);
+  };
+  
+  // Editar a partir do modal de detalhes
+  const editFromDetails = (pedido) => {
+    closeDetailsModal(); // Fecha modal de detalhes
+    openModal(pedido); // Abre modal de edição
+  };
 
-  // Abrir modal
+  // Abrir modal de edição/criação
   const openModal = (pedido = null) => {
     if (pedido) {
       setEditingId(pedido.id);
