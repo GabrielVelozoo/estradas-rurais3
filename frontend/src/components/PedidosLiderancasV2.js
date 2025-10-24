@@ -68,6 +68,24 @@ export default function PedidosLiderancasV2() {
       .toLowerCase()
       .trim();
   };
+  
+  // Efeito de debounce para busca (300ms)
+  useEffect(() => {
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+    
+    debounceTimer.current = setTimeout(() => {
+      setBuscaGeralDebounced(buscaGeral);
+      setPaginaAtual(1); // Reset para primeira página ao buscar
+    }, 300);
+    
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, [buscaGeral]);
 
   // Máscara para protocolo: 00.000.000-0
   const formatProtocolo = (value) => {
