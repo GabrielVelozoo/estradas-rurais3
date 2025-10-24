@@ -881,6 +881,158 @@ export default function PedidosLiderancasV2() {
           </div>
         </div>
       )}
+      
+      {/* Modal de Detalhes */}
+      {showDetailsModal && selectedPedido && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
+          onClick={closeDetailsModal}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header do Modal */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-6 rounded-t-2xl">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold mb-2">
+                    Detalhes do Pedido
+                  </h2>
+                  <p className="text-blue-100 text-sm">
+                    Informações completas do pedido de liderança
+                  </p>
+                </div>
+                <button
+                  onClick={closeDetailsModal}
+                  className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all"
+                  title="Fechar"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            {/* Conteúdo do Modal */}
+            <div className="p-8">
+              {/* Grid de informações */}
+              <div className="space-y-6">
+                {/* Protocolo com destaque */}
+                {selectedPedido.protocolo && (
+                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-blue-900 mb-1">Protocolo</p>
+                        <p className="text-xl font-mono font-bold text-blue-700">
+                          {selectedPedido.protocolo}
+                        </p>
+                      </div>
+                      <ProtocolLink protocolo={selectedPedido.protocolo} />
+                    </div>
+                  </div>
+                )}
+                
+                {/* Título */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm font-medium text-gray-600 mb-2">📋 Título</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {selectedPedido.titulo || 'Não informado'}
+                  </p>
+                </div>
+                
+                {/* Status */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm font-medium text-gray-600 mb-2">🏷️ Status</p>
+                  <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${
+                    selectedPedido.status === 'atendido' ? 'bg-green-100 text-green-800 border-2 border-green-300' :
+                    selectedPedido.status === 'em_andamento' ? 'bg-blue-100 text-blue-800 border-2 border-blue-300' :
+                    selectedPedido.status === 'aguardando_atendimento' ? 'bg-yellow-100 text-yellow-800 border-2 border-yellow-300' :
+                    selectedPedido.status === 'arquivado' ? 'bg-gray-100 text-gray-800 border-2 border-gray-300' :
+                    'bg-gray-100 text-gray-600 border-2 border-gray-300'
+                  }`}>
+                    {formatStatus(selectedPedido.status)}
+                  </span>
+                </div>
+                
+                {/* Grid 2 colunas */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Município */}
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm font-medium text-gray-600 mb-2">🏙️ Município</p>
+                    <p className="text-base font-semibold text-gray-900">
+                      {selectedPedido.municipio_nome}
+                    </p>
+                  </div>
+                  
+                  {/* Liderança */}
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm font-medium text-gray-600 mb-2">👤 Liderança</p>
+                    <p className="text-base font-semibold text-gray-900">
+                      {selectedPedido.lideranca_nome}
+                    </p>
+                  </div>
+                  
+                  {/* Telefone */}
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm font-medium text-gray-600 mb-2">📞 Telefone</p>
+                    <p className="text-base font-mono text-gray-900">
+                      {selectedPedido.lideranca_telefone || 'Não informado'}
+                    </p>
+                  </div>
+                  
+                  {/* Data de criação */}
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm font-medium text-gray-600 mb-2">📅 Criado em</p>
+                    <p className="text-base font-semibold text-gray-900">
+                      {new Date(selectedPedido.created_at).toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Descrição completa */}
+                {selectedPedido.descricao && (
+                  <div className="bg-amber-50 border-l-4 border-amber-500 p-6 rounded-lg">
+                    <p className="text-sm font-medium text-amber-900 mb-3 flex items-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Descrição Completa
+                    </p>
+                    <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
+                      {selectedPedido.descricao}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Footer com botões */}
+            <div className="bg-gray-50 px-8 py-6 rounded-b-2xl flex flex-col sm:flex-row gap-3 justify-end border-t border-gray-200">
+              <button
+                onClick={closeDetailsModal}
+                className="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+              >
+                Fechar
+              </button>
+              <button
+                onClick={() => editFromDetails(selectedPedido)}
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Editar Pedido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
