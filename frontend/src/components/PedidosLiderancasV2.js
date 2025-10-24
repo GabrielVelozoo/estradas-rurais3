@@ -30,10 +30,18 @@ export default function PedidosLiderancasV2() {
   const [filtroLideranca, setFiltroLideranca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
   
-  // Estados do modal
+  // Estados de paginação
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [itensPorPagina, setItensPorPagina] = useState(25);
+  
+  // Estados do modal de edição/criação
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  
+  // Estados do modal de detalhes
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedPedido, setSelectedPedido] = useState(null);
   
   // Estados do formulário
   const [formData, setFormData] = useState({
@@ -46,6 +54,10 @@ export default function PedidosLiderancasV2() {
     descricao: '',
     status: ''
   });
+  
+  // Debounce para busca
+  const [buscaGералDebounced, setBuscaGeralDebounced] = useState('');
+  const debounceTimer = useRef(null);
 
   // Função para normalizar texto (remover acentos)
   const normalizeText = (text) => {
