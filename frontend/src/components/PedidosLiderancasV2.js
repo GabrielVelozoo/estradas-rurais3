@@ -194,7 +194,7 @@ export default function PedidosLiderancasV2() {
     fetchPedidos();
   }, [fetchPedidos]);
 
-  // Filtrar pedidos (acento-insensível)
+  // Filtrar pedidos (acento-insensível) com debounce
   const pedidosFiltrados = useMemo(() => {
     try {
       if (!Array.isArray(pedidos)) return [];
@@ -202,9 +202,9 @@ export default function PedidosLiderancasV2() {
       return pedidos.filter(pedido => {
         if (!pedido || typeof pedido !== 'object') return false;
 
-        // Busca geral
-        if (buscaGeral) {
-          const buscaNorm = normalizeText(buscaGeral);
+        // Busca geral (usando versão debounced)
+        if (buscaGeralDebounced) {
+          const buscaNorm = normalizeText(buscaGeralDebounced);
           const match = (
             normalizeText(pedido.protocolo || '').includes(buscaNorm) ||
             normalizeText(pedido.titulo || '').includes(buscaNorm) ||
