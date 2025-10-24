@@ -995,20 +995,24 @@ export default function PedidosLiderancasV2() {
                   </div>
                 </div>
                 
-                {/* Descrição completa */}
-                {selectedPedido.descricao && (
-                  <div className="bg-amber-50 border-l-4 border-amber-500 p-6 rounded-lg">
-                    <p className="text-sm font-medium text-amber-900 mb-3 flex items-center gap-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Descrição Completa
-                    </p>
+                {/* Descrição completa - sempre visível */}
+                <div className="bg-amber-50 border-l-4 border-amber-500 p-6 rounded-lg">
+                  <p className="text-sm font-medium text-amber-900 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Descrição Completa
+                  </p>
+                  {selectedPedido.descricao ? (
                     <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
                       {selectedPedido.descricao}
                     </p>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-gray-500 italic">
+                      Nenhuma descrição informada
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
             
