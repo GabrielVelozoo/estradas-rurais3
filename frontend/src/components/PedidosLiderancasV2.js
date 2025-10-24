@@ -573,70 +573,168 @@ export default function PedidosLiderancasV2() {
                 : '📋 Nenhum pedido cadastrado ainda'}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-                  <tr>
-                    <th className="px-6 py-4 text-left font-semibold">Protocolo</th>
-                    <th className="px-6 py-4 text-left font-semibold">Título</th>
-                    <th className="px-6 py-4 text-left font-semibold">Município</th>
-                    <th className="px-6 py-4 text-left font-semibold">Liderança</th>
-                    <th className="px-6 py-4 text-left font-semibold">Telefone</th>
-                    <th className="px-6 py-4 text-left font-semibold">Status</th>
-                    <th className="px-6 py-4 text-left font-semibold">Criado em</th>
-                    <th className="px-6 py-4 text-center font-semibold no-print">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pedidosFiltrados.map((pedido, index) => (
-                    <tr
-                      key={pedido.id}
-                      className={`border-b border-gray-100 hover:bg-blue-50 transition-colors ${
-                        index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                      }`}
-                    >
-                      <td className="px-6 py-4 font-mono text-sm">
-                        <ProtocolLink protocolo={pedido.protocolo} />
-                      </td>
-                      <td className="px-6 py-4">{pedido.titulo || '-'}</td>
-                      <td className="px-6 py-4 font-medium">{pedido.municipio_nome}</td>
-                      <td className="px-6 py-4">{pedido.lideranca_nome}</td>
-                      <td className="px-6 py-4">{pedido.lideranca_telefone || '-'}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          pedido.status === 'atendido' ? 'bg-green-100 text-green-800' :
-                          pedido.status === 'em_andamento' ? 'bg-blue-100 text-blue-800' :
-                          pedido.status === 'aguardando_atendimento' ? 'bg-yellow-100 text-yellow-800' :
-                          pedido.status === 'arquivado' ? 'bg-gray-100 text-gray-800' :
-                          'bg-gray-100 text-gray-600'
-                        }`}>
-                          {formatStatus(pedido.status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {new Date(pedido.created_at).toLocaleDateString('pt-BR')}
-                      </td>
-                      <td className="px-6 py-4 no-print">
-                        <div className="flex gap-2 justify-center">
-                          <button
-                            onClick={() => openModal(pedido)}
-                            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleDelete(pedido.id)}
-                            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
-                          >
-                            Excluir
-                          </button>
-                        </div>
-                      </td>
+            <>
+              {/* Tabela com header sticky */}
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full">
+                  <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-0 z-10">
+                    <tr>
+                      <th className="px-6 py-4 text-left font-semibold text-sm">Protocolo</th>
+                      <th className="px-6 py-4 text-left font-semibold text-sm">Título</th>
+                      <th className="px-6 py-4 text-left font-semibold text-sm">Município</th>
+                      <th className="px-6 py-4 text-left font-semibold text-sm">Liderança</th>
+                      <th className="px-6 py-4 text-left font-semibold text-sm">Telefone</th>
+                      <th className="px-6 py-4 text-left font-semibold text-sm">Status</th>
+                      <th className="px-6 py-4 text-center font-semibold text-sm no-print">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {pedidosPaginados.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                          Nenhum pedido encontrado
+                        </td>
+                      </tr>
+                    ) : (
+                      pedidosPaginados.map((pedido, index) => (
+                        <tr
+                          key={pedido.id}
+                          onClick={() => openDetailsModal(pedido)}
+                          className={`border-b border-gray-100 hover:bg-blue-50 transition-all duration-150 cursor-pointer ${
+                            index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                          }`}
+                        >
+                          <td className="px-6 py-4 font-mono text-sm">
+                            <ProtocolLink protocolo={pedido.protocolo} />
+                          </td>
+                          <td className="px-6 py-4 font-medium text-gray-900">
+                            {pedido.titulo || '-'}
+                          </td>
+                          <td className="px-6 py-4 text-gray-700">
+                            {pedido.municipio_nome}
+                          </td>
+                          <td className="px-6 py-4 text-gray-700">
+                            {pedido.lideranca_nome}
+                          </td>
+                          <td className="px-6 py-4 text-gray-600 text-sm">
+                            {pedido.lideranca_telefone || '-'}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                              pedido.status === 'atendido' ? 'bg-green-100 text-green-800 border border-green-200' :
+                              pedido.status === 'em_andamento' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                              pedido.status === 'aguardando_atendimento' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                              pedido.status === 'arquivado' ? 'bg-gray-100 text-gray-800 border border-gray-200' :
+                              'bg-gray-100 text-gray-600 border border-gray-200'
+                            }`}>
+                              {formatStatus(pedido.status)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 no-print" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex gap-2 justify-center">
+                              <button
+                                onClick={() => openDetailsModal(pedido)}
+                                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium transition-colors shadow-sm hover:shadow-md"
+                                title="Ver detalhes"
+                              >
+                                👁️ Ver
+                              </button>
+                              <button
+                                onClick={() => openModal(pedido)}
+                                className="px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-medium transition-colors shadow-sm hover:shadow-md"
+                                title="Editar pedido"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => handleDelete(pedido.id)}
+                                className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium transition-colors shadow-sm hover:shadow-md"
+                                title="Excluir pedido"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Paginação */}
+              {pedidosOrdenados.length > 0 && (
+                <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 px-4">
+                  {/* Info de registros */}
+                  <div className="text-sm text-gray-600">
+                    Mostrando <span className="font-semibold">{indexInicio + 1}</span> até{' '}
+                    <span className="font-semibold">{Math.min(indexFim, pedidosOrdenados.length)}</span> de{' '}
+                    <span className="font-semibold">{pedidosOrdenados.length}</span> pedidos
+                  </div>
+                  
+                  {/* Controles de paginação */}
+                  <div className="flex items-center gap-4">
+                    {/* Seletor de itens por página */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">Itens por página:</span>
+                      <select
+                        value={itensPorPagina}
+                        onChange={(e) => {
+                          setItensPorPagina(Number(e.target.value));
+                          setPaginaAtual(1);
+                        }}
+                        className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                    </div>
+                    
+                    {/* Botões de navegação */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => irParaPagina(1)}
+                        disabled={paginaAtual === 1}
+                        className="px-3 py-1 rounded-lg border border-gray-300 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                        title="Primeira página"
+                      >
+                        ««
+                      </button>
+                      <button
+                        onClick={() => irParaPagina(paginaAtual - 1)}
+                        disabled={paginaAtual === 1}
+                        className="px-3 py-1 rounded-lg border border-gray-300 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                        title="Página anterior"
+                      >
+                        ‹
+                      </button>
+                      
+                      <span className="px-4 py-1 text-sm font-medium text-gray-700">
+                        Página {paginaAtual} de {totalPaginas}
+                      </span>
+                      
+                      <button
+                        onClick={() => irParaPagina(paginaAtual + 1)}
+                        disabled={paginaAtual === totalPaginas}
+                        className="px-3 py-1 rounded-lg border border-gray-300 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                        title="Próxima página"
+                      >
+                        ›
+                      </button>
+                      <button
+                        onClick={() => irParaPagina(totalPaginas)}
+                        disabled={paginaAtual === totalPaginas}
+                        className="px-3 py-1 rounded-lg border border-gray-300 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                        title="Última página"
+                      >
+                        »»
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
