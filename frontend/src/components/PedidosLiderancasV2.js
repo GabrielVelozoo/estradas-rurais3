@@ -56,7 +56,7 @@ export default function PedidosLiderancasV2() {
   });
   
   // Debounce para busca
-  const [buscaGералDebounced, setBuscaGeralDebounced] = useState('');
+  const [buscaGeralDebounced, setBuscaGeralDebounced] = useState('');
   const debounceTimer = useRef(null);
 
   // Função para normalizar texto (remover acentos)
