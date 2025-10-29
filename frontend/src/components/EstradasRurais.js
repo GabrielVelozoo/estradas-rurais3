@@ -347,7 +347,7 @@ export default function EstradasRurais() {
           
           return municipio !== "" || protocolo !== "" || descricao !== "" || valor !== "";
         })
-        .map((c) => {
+        .map((c, index) => {
           const municipio = (c[0] || "").toString().trim();
           const protocolo = (c[1] || "").toString().trim();
           const secretaria = (c[2] || "").toString().trim().toUpperCase(); // SECRETARIA substituiu prefeito
@@ -357,15 +357,15 @@ export default function EstradasRurais() {
           const prioridadeCell = (c[priIndex] || "").toString().trim().toLowerCase();
           const ultimaEdicao = (c[7] || "").toString().trim(); // ✅ Coluna H - Última edição
           
-          // Debug: log da primeira linha com ultimaEdicao
-          if (ultimaEdicao && !window._loggedUltimaEdicao) {
-            console.log('🕐 DEBUG ultimaEdicao:', {
+          // Debug detalhado: log das primeiras 3 linhas
+          if (index < 3) {
+            console.log(`🔍 LINHA ${index + 1}:`, {
+              totalColunas: c.length,
               municipio,
-              ultimaEdicao,
-              tipo: typeof ultimaEdicao,
-              coluna7: c[7]
+              'coluna[7]': c[7],
+              'ultimaEdicao': ultimaEdicao,
+              'temValor': !!ultimaEdicao
             });
-            window._loggedUltimaEdicao = true;
           }
           
           return {
