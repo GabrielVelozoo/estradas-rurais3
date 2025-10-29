@@ -424,7 +424,9 @@ export default function PedidosMaquinariosV2() {
         throw new Error('Erro ao excluir');
       }
 
-      await fetchPedidos();
+      // ✅ Invalidar cache e forçar refresh da lista
+      clearCache('maquinarios-pedidos');
+      await fetchPedidos(true); // Force fresh data
       alert('Pedido excluído com sucesso!');
     } catch (error) {
       console.error('Erro ao excluir:', error);
