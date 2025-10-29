@@ -354,6 +354,17 @@ export default function EstradasRurais() {
           const prioridadeCell = (c[priIndex] || "").toString().trim().toLowerCase();
           const ultimaEdicao = (c[7] || "").toString().trim(); // ✅ Coluna H - Última edição
           
+          // Debug: log da primeira linha com ultimaEdicao
+          if (ultimaEdicao && !window._loggedUltimaEdicao) {
+            console.log('🕐 DEBUG ultimaEdicao:', {
+              municipio,
+              ultimaEdicao,
+              tipo: typeof ultimaEdicao,
+              coluna7: c[7]
+            });
+            window._loggedUltimaEdicao = true;
+          }
+          
           return {
             municipio: municipio || "Não informado",
             protocolo: protocolo,
