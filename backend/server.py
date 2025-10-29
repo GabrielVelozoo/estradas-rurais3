@@ -96,28 +96,44 @@ async def get_status_checks():
 async def get_estradas_rurais(current_user: User = Depends(get_current_active_user)):
     """
     Busca dados do Google Sheets incluindo coluna H (Última edição).
+    Usa FORMATTED_VALUE para pegar datas já formatadas.
     """
     import aiohttp
     try:
-        # Incluir coluna H para capturar "Última edição"
+        # Incluir coluna H + formatação de datas
+        url = (
+            "https://sheets.googleapis.com/v4/spreadsheets/"
+            "1jaHnRgqRyMLjZVvaRSkG2kOyZ4kMEBgsPhwYIGVj490/values/A:H"
+            "?key=AIzaSyBdd6E9Dz5W68XdhLCsLIlErt1ylwTt5Jk"
+            "&valueRenderOption=FORMATTED_VALUE"
+            "&dateTimeRenderOption=FORMATTED_STRING"
+        )
+        
         async with aiohttp.ClientSession() as session:
-            async with session.get(
-                "https://sheets.googleapis.com/v4/spreadsheets/1jaHnRgqRyMLjZVvaRSkG2kOyZ4kMEBgsPhwYIGVj490/values/A:H?key=AIzaSyBdd6E9Dz5W68XdhLCsLIlErt1ylwTt5Jk"
-            ) as response:
+            async with session.get(url) as response:
                 if response.status == 200:
                     data = await response.json()
                     
-                    # Log para debug - primeira linha com coluna H
+                    # Log detalhado para debug
                     if "values" in data and len(data["values"]) > 1:
+                        header = data["values"][0] if len(data["values"]) > 0 else []
                         first_row = data["values"][1] if len(data["values"]) > 1 else []
+                        
+                        logger.info(f"✅ SHEETS - Colunas no header: {len(header)}")
+                        logger.info(f"✅ SHEETS - Coluna H (header): {header[7] if len(header) > 7 else 'N/A'}")
+                        logger.info(f"✅ SHEETS - Total de linhas: {len(data['values']) - 1}")
+                        
                         if len(first_row) > 7:
-                            logger.info(f"DEBUG coluna H (primeira linha): {first_row[7]}")
+                            logger.info(f"✅ SHEETS - Coluna H (primeira linha): '{first_row[7]}'")
+                        else:
+                            logger.warning(f"⚠️ SHEETS - Primeira linha só tem {len(first_row)} colunas")
                     
                     return data
                 else:
+                    logger.error(f"❌ SHEETS API status: {response.status}")
                     raise Exception(f"API request failed with status {response.status}")
     except Exception as e:
-        logger.error(f"Error fetching Google Sheets data: {e}")
+        logger.error(f"❌ Error fetching Google Sheets data: {e}")
         raise HTTPException(status_code=500, detail="Error fetching data from Google Sheets")
 
 # ---------- INCLUSÃO DE ROTAS ----------
