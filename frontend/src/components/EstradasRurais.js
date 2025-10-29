@@ -243,8 +243,9 @@ export default function EstradasRurais() {
   const [sortDir, setSortDir] = useState("asc");
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState(60);
+  const [autoRefresh, setAutoRefresh] = useState(true); // ✅ Ativado por padrão
+  const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState(30); // ✅ 30s para capturar mudanças da planilha
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState(null); // ✅ Timestamp da última atualização
   const intervalRef = useRef(null);
 
   const fetchData = useCallback(async (forceFresh = false) => {
