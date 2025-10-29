@@ -6,6 +6,40 @@ const API_KEY = process.env.REACT_APP_SHEETS_API_KEY;
 
 // Componente para linha da tabela com descrição expansível
 const TabelaLinha = ({ r, i }) => {
+  // Função para formatar data de última edição
+  const formatUltimaEdicao = (dateString) => {
+    if (!dateString || dateString === '') return null;
+    
+    try {
+      let date;
+      
+      // Se for número (serial date do Excel), converter
+      if (!isNaN(dateString) && dateString.toString().length <= 10) {
+        const excelEpoch = new Date(1899, 11, 30);
+        date = new Date(excelEpoch.getTime() + parseFloat(dateString) * 24 * 60 * 60 * 1000);
+      } else {
+        date = new Date(dateString);
+      }
+      
+      if (isNaN(date.getTime())) return null;
+      
+      // Formatar no fuso America/Sao_Paulo
+      const formatter = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      
+      return formatter.format(date);
+    } catch (error) {
+      return null;
+    }
+  };
+  
   // Função para determinar a cor e ícone da secretaria
   const getSecretariaStyle = (secretaria) => {
     switch(secretaria) {
