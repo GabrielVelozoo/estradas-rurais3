@@ -94,14 +94,48 @@ async def get_status_checks():
 
 @api_router.get("/estradas-rurais")
 async def get_estradas_rurais(current_user: User = Depends(get_current_active_user)):
+    """
+    Busca dados do Google Sheets incluindo coluna H (Última edição).
+    Retorna dados normalizados com ultimaEdicao por linha.
+    """
     import aiohttp
     try:
+        # Incluir coluna H para capturar "Última edição"
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                "https://sheets.googleapis.com/v4/spreadsheets/1jaHnRgqRyMLjZVvaRSkG2kOyZ4kMEBgsPhwYIGVj490/values/A:G?key=AIzaSyBdd6E9Dz5W68XdhLCsLIlErt1ylwTt5Jk"
+                "https://sheets.googleapis.com/v4/spreadsheets/1jaHnRgqRyMLjZVvaRSkG2kOyZ4kMEBgsPhwYIGVj490/values/A:H?key=AIzaSyBdd6E9Dz5W68XdhLCsLIlErt1ylwTt5Jk"
+                + "&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING"
             ) as response:
                 if response.status == 200:
                     data = await response.json()
+                    
+                    # Processar dados para incluir ultimaEdicao
+                    if "values" in data and len(data["values"]) > 1:
+                        rows = data["values"]
+                        header = rows[0]
+                        body = rows[1:]
+                        
+                        # Adicionar campo ultimaEdicao para cada linha
+                        # Coluna H (índice 7) contém a data de última edição
+                        processed_rows = []
+                        for row in body:
+                            # Garantir que a linha tem todos os índices
+                            while len(row) < 8:
+                                row.append("")
+                            
+                            # Criar objeto com ultimaEdicao
+                            row_data = {
+                                "values": row,
+                                "ultimaEdicao": row[7] if len(row) > 7 and row[7] else None
+                            }
+                            processed_rows.append(row_data)
+                        
+                        return {
+                            "values": [header] + [r["values"] for r in processed_rows],
+                            "rowsWithMeta": processed_rows,
+                            "hasUltimaEdicao": True
+                        }
+                    
                     return data
                 else:
                     raise Exception(f"API request failed with status {response.status}")
