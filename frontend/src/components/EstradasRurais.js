@@ -323,22 +323,51 @@ export default function EstradasRurais() {
       
       // 🔍 DEBUG: Log dos dados brutos recebidos
       console.log('📊 DADOS RECEBIDOS DO BACKEND:');
-      console.log('  - Total de linhas:', data.values.length);
-      console.log('  - Primeira linha (header):', data.values[0]);
-      console.log('  - Segunda linha (primeira data):', data.values[1]);
-      console.log('  - Colunas na segunda linha:', data.values[1]?.length);
-      console.log('  - Coluna H da segunda linha (índice 7):', data.values[1]?.[7]);
+      console.log('  - Total de linhas no array:', data.values.length);
+      console.log('');
+      console.log('🔍 Primeiras 4 linhas do Sheets:');
+      for (let i = 0; i < Math.min(4, data.values.length); i++) {
+        const row = data.values[i];
+        console.log(`  Linha ${i}:`, {
+          totalColunas: row.length,
+          primeiraColuna: row[0],
+          colunaH: row[7],
+          linhaCompleta: row
+        });
+      }
+      console.log('');
+      
+      // Identificar qual linha é o header real
+      const linhaHeader = data.values[0];
+      const segundaLinha = data.values[1];
+      const terceiraLinha = data.values[2];
+      
+      console.log('🔍 Análise das primeiras linhas:');
+      console.log('  Linha 0 (primeira):', linhaHeader[0], '→', linhaHeader[7]);
+      console.log('  Linha 1 (segunda):', segundaLinha?.[0], '→', segundaLinha?.[7]);
+      console.log('  Linha 2 (terceira):', terceiraLinha?.[0], '→', terceiraLinha?.[7]);
+      console.log('');
+      
+      // Detectar se linha 1 é header (tem "MUNICÍPIO" ou similar)
+      const primeiraLinhaEHeader = linhaHeader[0]?.toString().toUpperCase().includes('MUNIC');
+      const segundaLinhaEHeader = segundaLinha?.[0]?.toString().toUpperCase().includes('MUNIC');
+      
+      console.log('🔍 Detecção de header:');
+      console.log('  Linha 0 é header?', primeiraLinhaEHeader);
+      console.log('  Linha 1 é header?', segundaLinhaEHeader);
+      console.log('');
       
       // ✅ 2) Detectar automaticamente qual é a coluna de prioridade
-      const header = data.values[0].map(h => (h || '').toString().trim().toLowerCase());
+      const header = data.values[1].map(h => (h || '').toString().trim().toLowerCase());
       let priIndex = header.findIndex(h => h.includes('priorid') || h.includes('priorit'));
       if (priIndex === -1) priIndex = 6; // Fallback para coluna G
       
-      console.log('HEADER:', header);
-      console.log('priIndex:', priIndex);
+      console.log('📋 HEADER usado:', header);
+      console.log('📋 priIndex:', priIndex);
+      console.log('');
 
-      // ✅ 3) Monte as linhas corretamente
-      const allRows = data.values.slice(1)
+      // ✅ 3) Monte as linhas corretamente - COMEÇAR DA LINHA 2 (terceira linha)
+      const allRows = data.values.slice(2)
         .filter((c) => {
           // Incluir linha se tem dados significativos
           const municipio = (c[0] || "").toString().trim();
