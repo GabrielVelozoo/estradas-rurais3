@@ -268,6 +268,7 @@ export default function EstradasRurais() {
           const descricao = (c[4] || "").toString().trim();
           const valor = (c[5] || "").toString().trim();
           const prioridadeCell = (c[priIndex] || "").toString().trim().toLowerCase();
+          const ultimaEdicao = (c[7] || "").toString().trim(); // ✅ Coluna H - Última edição
           
           return {
             municipio: municipio || "Não informado",
@@ -280,7 +281,8 @@ export default function EstradasRurais() {
             _valorNum: parseCurrencyToNumber(valor),
             prioridadeRaw: prioridadeCell,
             prioridade: prioridadeCell.includes('priorid') || prioridadeCell.includes('priorit'),
-            isPrioridade: false // Será definido abaixo
+            isPrioridade: false, // Será definido abaixo
+            ultimaEdicao: ultimaEdicao // ✅ Última edição da planilha
           };
         });
 
