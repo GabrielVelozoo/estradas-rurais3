@@ -144,17 +144,20 @@ const TabelaLinha = ({ r, i }) => {
             </div>
           )}
           {r.estado && (
-            <div className="text-gray-600 text-sm">
-              {r.estado}
+            <div className="text-gray-600 text-sm flex items-center flex-wrap gap-1">
+              <span>{r.estado}</span>
+              {/* ✅ Última edição - inline no final da descrição, em vermelho */}
+              {r.ultimaEdicao && formatUltimaEdicao(r.ultimaEdicao) && (
+                <span className="text-red-500 text-xs font-medium ml-2 whitespace-nowrap">
+                  🕐 Última edição: {formatUltimaEdicao(r.ultimaEdicao)}
+                </span>
+              )}
             </div>
           )}
-          {/* ✅ Última edição */}
-          {r.ultimaEdicao && formatUltimaEdicao(r.ultimaEdicao) && (
-            <div className="text-xs text-blue-600 font-medium flex items-center gap-1 mt-1">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Última edição: {formatUltimaEdicao(r.ultimaEdicao)}
+          {/* Se não tiver estado mas tiver última edição, mostrar sozinha */}
+          {!r.estado && r.ultimaEdicao && formatUltimaEdicao(r.ultimaEdicao) && (
+            <div className="text-red-500 text-xs font-medium">
+              🕐 Última edição: {formatUltimaEdicao(r.ultimaEdicao)}
             </div>
           )}
         </div>
