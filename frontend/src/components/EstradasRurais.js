@@ -360,6 +360,7 @@ export default function EstradasRurais() {
       const rows = allRows;
       console.log('total prioridades finais:', rows.filter(r => r.isPrioridade).length);
       setDados(rows);
+      setUltimaAtualizacao(new Date()); // ✅ Registrar quando os dados foram atualizados
       setCarregando(false);
     } catch (e) {
       if (e.name === 'AbortError') {
