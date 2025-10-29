@@ -140,6 +140,46 @@ export default function EstradasRurais() {
       .toLowerCase()
       .trim();
   };
+  
+  // Função para formatar data de última edição no fuso America/Sao_Paulo
+  const formatUltimaEdicao = (dateString) => {
+    if (!dateString || dateString === '') return null;
+    
+    try {
+      // Tentar parsear a data do Google Sheets
+      // Pode vir como "dd/MM/yyyy HH:mm:ss" ou timestamp
+      let date;
+      
+      // Se for número (serial date do Excel), converter
+      if (!isNaN(dateString) && dateString.toString().length <= 10) {
+        // Serial date do Excel (dias desde 1899-12-30)
+        const excelEpoch = new Date(1899, 11, 30);
+        date = new Date(excelEpoch.getTime() + parseFloat(dateString) * 24 * 60 * 60 * 1000);
+      } else {
+        // Tentar como string de data
+        date = new Date(dateString);
+      }
+      
+      // Verificar se a data é válida
+      if (isNaN(date.getTime())) return null;
+      
+      // Formatar no fuso America/Sao_Paulo
+      const formatter = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      
+      return formatter.format(date);
+    } catch (error) {
+      console.warn('Erro ao formatar data:', dateString, error);
+      return null;
+    }
+  };
 
   // Funções para máscara de protocolo
   const formatProtocolo = (value) => {
