@@ -423,10 +423,23 @@ export default function EstradasRurais() {
       });
 
       const rows = allRows;
+      
+      // 🔍 DEBUG: Estatísticas detalhadas
+      const totalLinhas = rows.length;
+      const linhasComUltimaEdicao = rows.filter(r => r.ultimaEdicao && r.ultimaEdicao !== '').length;
+      const percentual = totalLinhas > 0 ? Math.round((linhasComUltimaEdicao / totalLinhas) * 100) : 0;
+      
+      console.log('📊 ESTATÍSTICAS FINAIS:');
+      console.log(`  ✅ Total de linhas processadas: ${totalLinhas}`);
+      console.log(`  ✅ Linhas com ultimaEdicao: ${linhasComUltimaEdicao} (${percentual}%)`);
+      console.log(`  ⚠️ Linhas SEM ultimaEdicao: ${totalLinhas - linhasComUltimaEdicao}`);
+      console.log('');
+      console.log('🔍 Primeiras 5 linhas com ultimaEdicao:');
+      rows.filter(r => r.ultimaEdicao).slice(0, 5).forEach((r, i) => {
+        console.log(`  ${i + 1}. ${r.municipio}: ${r.ultimaEdicao}`);
+      });
+      
       console.log('total prioridades finais:', rows.filter(r => r.isPrioridade).length);
-      console.log('🔍 Total de linhas:', rows.length);
-      console.log('🔍 Linhas com ultimaEdicao:', rows.filter(r => r.ultimaEdicao && r.ultimaEdicao !== '').length);
-      console.log('🔍 Exemplo de linha com dados:', rows[0]);
       setDados(rows);
       setUltimaAtualizacao(new Date()); // ✅ Registrar quando os dados foram atualizados
       setCarregando(false);
