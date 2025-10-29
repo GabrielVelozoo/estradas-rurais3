@@ -321,6 +321,14 @@ export default function EstradasRurais() {
         return;
       }
       
+      // 🔍 DEBUG: Log dos dados brutos recebidos
+      console.log('📊 DADOS RECEBIDOS DO BACKEND:');
+      console.log('  - Total de linhas:', data.values.length);
+      console.log('  - Primeira linha (header):', data.values[0]);
+      console.log('  - Segunda linha (primeira data):', data.values[1]);
+      console.log('  - Colunas na segunda linha:', data.values[1]?.length);
+      console.log('  - Coluna H da segunda linha (índice 7):', data.values[1]?.[7]);
+      
       // ✅ 2) Detectar automaticamente qual é a coluna de prioridade
       const header = data.values[0].map(h => (h || '').toString().trim().toLowerCase());
       let priIndex = header.findIndex(h => h.includes('priorid') || h.includes('priorit'));
