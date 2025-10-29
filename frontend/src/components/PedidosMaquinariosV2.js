@@ -397,7 +397,9 @@ export default function PedidosMaquinariosV2() {
         throw new Error(errorMessage);
       }
 
-      await fetchPedidos();
+      // ✅ Invalidar cache e forçar refresh da lista
+      clearCache('maquinarios-pedidos');
+      await fetchPedidos(true); // Force fresh data
       closeModal();
       alert(editingId ? 'Pedido atualizado com sucesso!' : 'Pedido criado com sucesso!');
     } catch (error) {
