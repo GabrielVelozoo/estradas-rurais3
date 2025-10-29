@@ -416,6 +416,9 @@ export default function EstradasRurais() {
 
       const rows = allRows;
       console.log('total prioridades finais:', rows.filter(r => r.isPrioridade).length);
+      console.log('🔍 Total de linhas:', rows.length);
+      console.log('🔍 Linhas com ultimaEdicao:', rows.filter(r => r.ultimaEdicao && r.ultimaEdicao !== '').length);
+      console.log('🔍 Exemplo de linha com dados:', rows[0]);
       setDados(rows);
       setUltimaAtualizacao(new Date()); // ✅ Registrar quando os dados foram atualizados
       setCarregando(false);
