@@ -660,14 +660,30 @@ export default function EstradasRurais() {
               <h1 className="text-3xl md:text-4xl font-bold text-gray-800 flex items-center gap-3">
                 🛣️ Estradas Rurais
               </h1>
-              <p className="text-gray-600 mt-2 text-lg">Painel de Investimentos Municipais</p>
+              <p className="text-gray-600 mt-2 text-lg flex items-center gap-2">
+                Painel de Investimentos Municipais
+                {ultimaAtualizacao && (
+                  <span className="text-sm text-blue-600 font-medium ml-2 flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Atualizado: {ultimaAtualizacao.toLocaleTimeString('pt-BR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit'
+                    })}
+                    {autoRefresh && <span className="animate-pulse">⚡</span>}
+                  </span>
+                )}
+              </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
               <button 
                 onClick={() => fetchData(true)} 
                 className="px-4 py-2 rounded-lg bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                title="Atualizar dados da planilha agora"
               >
-                🔄 Atualizar
+                🔄 Atualizar Agora
               </button>
               <button 
                 onClick={() => setApenasPrioridades(!apensPrioridades)}
