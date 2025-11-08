@@ -140,6 +140,17 @@ function App() {
             />
               </Routes>
             </Suspense>
+            <ToastContainer
+              position="top-right"
+              autoClose={3000}
+              hideProgressBar={false}
+              newestOnTop
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+            />
           </AuthProvider>
         </DataCacheProvider>
       </BrowserRouter>
