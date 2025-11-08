@@ -3,6 +3,8 @@ import React, { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { DataCacheProvider } from "./contexts/DataCacheContext";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Componentes essenciais carregados imediatamente
 import Home from "./components/Home";
