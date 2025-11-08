@@ -2686,7 +2686,7 @@ class InformacoesGeraisTester:
             
         try:
             response = self.session.get(
-                f"{BACKEND_URL}/municipio-info/1",
+                f"{INTERNAL_BACKEND_URL}/municipio-info/1",
                 cookies=self.admin_cookies
             )
             
