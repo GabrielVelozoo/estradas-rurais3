@@ -18,6 +18,7 @@ const AdminPanel = lazy(() => import("./components/AdminPanel"));
 const Municipios = lazy(() => import("./components/Municipios"));
 const PedidosMaquinarios = lazy(() => import("./components/PedidosMaquinarios"));
 const PedidosLiderancas = lazy(() => import("./components/PedidosLiderancas"));
+const InformacoesGerais = lazy(() => import("./components/InformacoesGerais"));
 
 // Componente de loading
 const LoadingFallback = () => (
