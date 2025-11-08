@@ -3237,8 +3237,9 @@ if __name__ == "__main__":
     print("4. Focused GET /api/liderancas Test")
     print("5. Test POST /api/liderancas with Optional Empty Fields")
     print("6. Test Lideranças V2 - POST COLLECTION CLEANUP (REVIEW REQUEST)")
+    print("7. Test Informações Gerais Endpoints (NEW)")
     
-    choice = input("Enter choice (1-6): ").strip()
+    choice = input("Enter choice (1-7): ").strip()
     
     if choice == "1":
         tester = AuthTester()
