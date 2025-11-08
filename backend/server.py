@@ -198,6 +198,9 @@ app.include_router(municipios_router, prefix="/api")
 app.include_router(liderancas_v2_router, prefix="/api")
 app.include_router(maquinarios_v2_router, prefix="/api")
 
+# Informações Gerais
+app.include_router(municipio_info_router, prefix="/api")
+
 
 # -------------------------------------------------
 # Eventos
