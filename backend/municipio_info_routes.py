@@ -33,7 +33,7 @@ municipio_liderancas_collection = db.get_collection("municipio_liderancas")
 # MunicipioInfo Routes (Manual Data - Admin Only for Write)
 # ============================================================================
 
-@router.get("/municipio-info/{municipio_id}", response_model=Optional[MunicipioInfo])
+@router.get("/municipio-info/{municipio_id}")
 async def get_municipio_info(
     municipio_id: int,
     current_user: User = Depends(get_current_user)
