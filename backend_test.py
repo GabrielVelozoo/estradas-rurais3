@@ -3277,9 +3277,12 @@ if __name__ == "__main__":
     elif choice == "6":
         tester = LiderancasV2Tester()
         success = tester.run_v2_tests()
+    elif choice == "7":
+        tester = InformacoesGeraisTester()
+        success = tester.run_all_tests()
     else:
-        print("Invalid choice. Running Lideranças V2 test by default.")
-        tester = LiderancasV2Tester()
-        success = tester.run_v2_tests()
+        print("Invalid choice. Running Informações Gerais test by default.")
+        tester = InformacoesGeraisTester()
+        success = tester.run_all_tests()
     
     sys.exit(0 if success else 1)
