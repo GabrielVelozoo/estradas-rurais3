@@ -35,17 +35,19 @@ municipio_liderancas_collection = db.get_collection("municipio_liderancas")
 
 @router.get("/municipio-info/{municipio_id}")
 async def get_municipio_info(
-    municipio_id: int,
-    current_user: User = Depends(get_current_user)
+    municipio_id: int
 ):
     """Get manual information for a municipality (all users can read)."""
-    info = await municipio_info_collection.find_one({"municipio_id": municipio_id})
-    
-    if not info:
-        # Return None if not found (frontend will handle empty state)
-        return None
-    
-    return MunicipioInfo(**info)
+    try:
+        info = await municipio_info_collection.find_one({"municipio_id": municipio_id})
+        
+        if not info:
+            # Return None if not found (frontend will handle empty state)
+            return None
+        
+        return MunicipioInfo(**info)
+    except Exception as e:
+        return {"error": str(e), "municipio_id": municipio_id}
 
 
 @router.post("/municipio-info", response_model=MunicipioInfo, status_code=status.HTTP_201_CREATED)
