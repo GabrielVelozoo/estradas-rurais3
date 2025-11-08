@@ -192,14 +192,15 @@ async def get_estradas_rurais(current_user: User = Depends(get_current_active_us
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
 app.include_router(pedidos_router, prefix="/api")
+
+# Informações Gerais (must come before municipios to avoid route conflicts)
+app.include_router(municipio_info_router, prefix="/api")
+
 app.include_router(municipios_router, prefix="/api")
 
 # V2 (ativas)
 app.include_router(liderancas_v2_router, prefix="/api")
 app.include_router(maquinarios_v2_router, prefix="/api")
-
-# Informações Gerais
-app.include_router(municipio_info_router, prefix="/api")
 
 
 # -------------------------------------------------
