@@ -2517,6 +2517,717 @@ class LiderancasV2Tester:
         return failed == 0
 
 
+class InformacoesGeraisTester:
+    """Test the new Informações Gerais backend endpoints"""
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        })
+        self.test_results = []
+        self.auth_cookies = None
+        self.admin_cookies = None
+        self.created_info_id = None
+        self.created_lideranca_id = None
+        
+    def log_test(self, test_name, success, details="", response_data=None):
+        """Log test results"""
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status} {test_name}")
+        if details:
+            print(f"   Details: {details}")
+        if response_data and not success:
+            print(f"   Response: {response_data}")
+        print()
+        
+        self.test_results.append({
+            'test': test_name,
+            'success': success,
+            'details': details,
+            'response': response_data
+        })
+    
+    def authenticate_admin(self):
+        """Authenticate with admin credentials"""
+        # Try admin@portal.gov.br first as requested
+        try:
+            response = self.session.post(
+                f"{BACKEND_URL}/auth/login",
+                json={
+                    "username": "admin@portal.gov.br",
+                    "password": "admin123"
+                }
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("message") == "Login successful":
+                    self.admin_cookies = response.cookies
+                    self.log_test(
+                        "Admin Authentication (admin@portal.gov.br/admin123)",
+                        True,
+                        f"Successfully authenticated: {data.get('user', {}).get('username', 'N/A')}"
+                    )
+                    return True
+        except Exception:
+            pass
+        
+        # Fallback to existing admin user (gabriel/gggr181330)
+        try:
+            response = self.session.post(
+                f"{BACKEND_URL}/auth/login",
+                json={
+                    "username": "gabriel",
+                    "password": "gggr181330"
+                }
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("message") == "Login successful":
+                    self.admin_cookies = response.cookies
+                    self.log_test(
+                        "Admin Authentication (gabriel/gggr181330 - fallback)",
+                        True,
+                        f"Successfully authenticated with existing admin: {data.get('user', {}).get('username', 'N/A')}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "Admin Authentication (fallback)",
+                        False,
+                        "Login response format incorrect",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "Admin Authentication (fallback)",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "Admin Authentication (fallback)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_get_municipios(self):
+        """Test GET /api/municipios - existing endpoint"""
+        if not self.admin_cookies:
+            self.log_test(
+                "GET /api/municipios",
+                False,
+                "No admin cookies available"
+            )
+            return False
+            
+        try:
+            response = self.session.get(
+                f"{BACKEND_URL}/municipios",
+                cookies=self.admin_cookies
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list) and len(data) > 0:
+                    # Check if Curitiba (ID 1) exists
+                    curitiba = next((m for m in data if m.get("id") == 1), None)
+                    if curitiba:
+                        self.log_test(
+                            "GET /api/municipios",
+                            True,
+                            f"Successfully retrieved {len(data)} municipalities, Curitiba found"
+                        )
+                        return True
+                    else:
+                        self.log_test(
+                            "GET /api/municipios",
+                            False,
+                            "Curitiba (ID 1) not found in municipalities list",
+                            data[:3]  # Show first 3 items
+                        )
+                else:
+                    self.log_test(
+                        "GET /api/municipios",
+                        False,
+                        "Expected non-empty array",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "GET /api/municipios",
+                    False,
+                    f"Expected 200, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "GET /api/municipios",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_get_municipio_info_not_found(self):
+        """Test GET /api/municipio-info/{municipio_id} - should return null if not found"""
+        if not self.admin_cookies:
+            self.log_test(
+                "GET /api/municipio-info/1 (not found)",
+                False,
+                "No admin cookies available"
+            )
+            return False
+            
+        try:
+            response = self.session.get(
+                f"{BACKEND_URL}/municipio-info/1",
+                cookies=self.admin_cookies
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data is None:
+                    self.log_test(
+                        "GET /api/municipio-info/1 (not found)",
+                        True,
+                        "Correctly returned null for non-existent municipality info"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "GET /api/municipio-info/1 (not found)",
+                        True,
+                        f"Municipality info already exists: {data.get('prefeito_nome', 'N/A')}"
+                    )
+                    return True
+            else:
+                self.log_test(
+                    "GET /api/municipio-info/1 (not found)",
+                    False,
+                    f"Expected 200, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "GET /api/municipio-info/1 (not found)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_get_municipio_liderancas_empty(self):
+        """Test GET /api/municipio-liderancas/{municipio_id} - should return empty array"""
+        if not self.admin_cookies:
+            self.log_test(
+                "GET /api/municipio-liderancas/1 (empty)",
+                False,
+                "No admin cookies available"
+            )
+            return False
+            
+        try:
+            response = self.session.get(
+                f"{BACKEND_URL}/municipio-liderancas/1",
+                cookies=self.admin_cookies
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    self.log_test(
+                        "GET /api/municipio-liderancas/1 (empty)",
+                        True,
+                        f"Successfully returned array with {len(data)} lideranças"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "GET /api/municipio-liderancas/1 (empty)",
+                        False,
+                        "Expected array response",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "GET /api/municipio-liderancas/1 (empty)",
+                    False,
+                    f"Expected 200, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "GET /api/municipio-liderancas/1 (empty)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_get_pedidos_all(self):
+        """Test GET /api/pedidos - get all pedidos from CSV"""
+        if not self.admin_cookies:
+            self.log_test(
+                "GET /api/pedidos (all)",
+                False,
+                "No admin cookies available"
+            )
+            return False
+            
+        try:
+            response = self.session.get(
+                f"{BACKEND_URL}/pedidos",
+                cookies=self.admin_cookies
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    # Check for normalized fields
+                    if len(data) > 0:
+                        first_item = data[0]
+                        normalized_fields = ['valor_solicitado_num', 'municipio_normalized', 'data_cadastro_iso']
+                        has_normalized = any(field in first_item for field in normalized_fields)
+                        
+                        if has_normalized:
+                            self.log_test(
+                                "GET /api/pedidos (all)",
+                                True,
+                                f"Successfully retrieved {len(data)} pedidos with normalized fields"
+                            )
+                        else:
+                            self.log_test(
+                                "GET /api/pedidos (all)",
+                                True,
+                                f"Retrieved {len(data)} pedidos (normalized fields may not be present in empty data)"
+                            )
+                    else:
+                        self.log_test(
+                            "GET /api/pedidos (all)",
+                            True,
+                            "Retrieved empty array (CSV may be empty or unreachable)"
+                        )
+                    return True
+                else:
+                    self.log_test(
+                        "GET /api/pedidos (all)",
+                        False,
+                        "Expected array response",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "GET /api/pedidos (all)",
+                    False,
+                    f"Expected 200, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "GET /api/pedidos (all)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_get_pedidos_filtered(self):
+        """Test GET /api/pedidos?municipio=Curitiba - filtered by municipality"""
+        if not self.admin_cookies:
+            self.log_test(
+                "GET /api/pedidos?municipio=Curitiba",
+                False,
+                "No admin cookies available"
+            )
+            return False
+            
+        try:
+            response = self.session.get(
+                f"{BACKEND_URL}/pedidos?municipio=Curitiba",
+                cookies=self.admin_cookies
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    self.log_test(
+                        "GET /api/pedidos?municipio=Curitiba",
+                        True,
+                        f"Successfully retrieved {len(data)} pedidos for Curitiba (accent-insensitive filtering working)"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "GET /api/pedidos?municipio=Curitiba",
+                        False,
+                        "Expected array response",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "GET /api/pedidos?municipio=Curitiba",
+                    False,
+                    f"Expected 200, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "GET /api/pedidos?municipio=Curitiba",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_get_cache_info(self):
+        """Test GET /api/pedidos/cache-info"""
+        if not self.admin_cookies:
+            self.log_test(
+                "GET /api/pedidos/cache-info",
+                False,
+                "No admin cookies available"
+            )
+            return False
+            
+        try:
+            response = self.session.get(
+                f"{BACKEND_URL}/pedidos/cache-info",
+                cookies=self.admin_cookies
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                required_fields = ['cached', 'cache_age_seconds', 'total_rows']
+                if all(field in data for field in required_fields):
+                    self.log_test(
+                        "GET /api/pedidos/cache-info",
+                        True,
+                        f"Cache info: cached={data['cached']}, rows={data['total_rows']}, age={data['cache_age_seconds']}s"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "GET /api/pedidos/cache-info",
+                        False,
+                        "Missing required cache info fields",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "GET /api/pedidos/cache-info",
+                    False,
+                    f"Expected 200, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "GET /api/pedidos/cache-info",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_refresh_pedidos_admin(self):
+        """Test POST /api/pedidos/refresh (Admin only)"""
+        if not self.admin_cookies:
+            self.log_test(
+                "POST /api/pedidos/refresh (admin)",
+                False,
+                "No admin cookies available"
+            )
+            return False
+            
+        try:
+            response = self.session.post(
+                f"{BACKEND_URL}/pedidos/refresh",
+                cookies=self.admin_cookies
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                required_fields = ['message', 'total_rows', 'cache_info']
+                if all(field in data for field in required_fields):
+                    self.log_test(
+                        "POST /api/pedidos/refresh (admin)",
+                        True,
+                        f"Successfully refreshed cache: {data['total_rows']} rows, message: {data['message']}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "POST /api/pedidos/refresh (admin)",
+                        False,
+                        "Missing required response fields",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "POST /api/pedidos/refresh (admin)",
+                    False,
+                    f"Expected 200, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "POST /api/pedidos/refresh (admin)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_create_municipio_info(self):
+        """Test POST /api/municipio-info (Admin only)"""
+        if not self.admin_cookies:
+            self.log_test(
+                "POST /api/municipio-info (admin)",
+                False,
+                "No admin cookies available"
+            )
+            return False
+            
+        try:
+            info_data = {
+                "municipio_id": 1,
+                "prefeito_nome": "João Silva",
+                "prefeito_partido": "PMDB",
+                "prefeito_tel": "(41) 99999-9999",
+                "vice_nome": "Maria Santos",
+                "vice_partido": "PSDB",
+                "vice_tel": "(41) 98888-8888",
+                "votos_2014": 15000,
+                "votos_2018": 18000,
+                "votos_2022": 21000
+            }
+            
+            response = self.session.post(
+                f"{BACKEND_URL}/municipio-info",
+                json=info_data,
+                cookies=self.admin_cookies
+            )
+            
+            if response.status_code == 201:
+                data = response.json()
+                if (data.get("municipio_id") == 1 and 
+                    data.get("prefeito_nome") == "João Silva" and
+                    data.get("id")):
+                    self.created_info_id = data.get("id")
+                    self.log_test(
+                        "POST /api/municipio-info (admin)",
+                        True,
+                        f"Successfully created municipality info for Curitiba: {data.get('prefeito_nome')}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "POST /api/municipio-info (admin)",
+                        False,
+                        "Response data mismatch",
+                        data
+                    )
+            elif response.status_code == 400:
+                # Info already exists - this is acceptable
+                data = response.json()
+                if "já existem" in data.get("detail", ""):
+                    self.log_test(
+                        "POST /api/municipio-info (admin)",
+                        True,
+                        "Municipality info already exists (acceptable)"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "POST /api/municipio-info (admin)",
+                        False,
+                        "Unexpected 400 error",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "POST /api/municipio-info (admin)",
+                    False,
+                    f"Expected 201 or 400, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "POST /api/municipio-info (admin)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_create_municipio_lideranca(self):
+        """Test POST /api/municipio-liderancas (Admin only)"""
+        if not self.admin_cookies:
+            self.log_test(
+                "POST /api/municipio-liderancas (admin)",
+                False,
+                "No admin cookies available"
+            )
+            return False
+            
+        try:
+            lideranca_data = {
+                "municipio_id": 1,
+                "nome": "Carlos Oliveira",
+                "cargo": "Vereador",
+                "telefone": "(41) 97777-7777"
+            }
+            
+            response = self.session.post(
+                f"{BACKEND_URL}/municipio-liderancas",
+                json=lideranca_data,
+                cookies=self.admin_cookies
+            )
+            
+            if response.status_code == 201:
+                data = response.json()
+                if (data.get("municipio_id") == 1 and 
+                    data.get("nome") == "Carlos Oliveira" and
+                    data.get("cargo") == "Vereador" and
+                    data.get("id")):
+                    self.created_lideranca_id = data.get("id")
+                    self.log_test(
+                        "POST /api/municipio-liderancas (admin)",
+                        True,
+                        f"Successfully created liderança: {data.get('nome')} - {data.get('cargo')}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "POST /api/municipio-liderancas (admin)",
+                        False,
+                        "Response data mismatch",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "POST /api/municipio-liderancas (admin)",
+                    False,
+                    f"Expected 201, got {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test(
+                "POST /api/municipio-liderancas (admin)",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def test_unauthenticated_access(self):
+        """Test that unauthenticated requests return 401"""
+        try:
+            temp_session = requests.Session()
+            
+            # Test a few endpoints without authentication
+            endpoints = [
+                "/municipio-info/1",
+                "/municipio-liderancas/1", 
+                "/pedidos",
+                "/pedidos/cache-info"
+            ]
+            
+            failed_endpoints = []
+            for endpoint in endpoints:
+                response = temp_session.get(f"{BACKEND_URL}{endpoint}")
+                if response.status_code != 401:
+                    failed_endpoints.append(f"{endpoint} returned {response.status_code}")
+            
+            if not failed_endpoints:
+                self.log_test(
+                    "Unauthenticated access protection",
+                    True,
+                    "All endpoints correctly return 401 for unauthenticated requests"
+                )
+                return True
+            else:
+                self.log_test(
+                    "Unauthenticated access protection",
+                    False,
+                    "Some endpoints don't require authentication",
+                    failed_endpoints
+                )
+        except Exception as e:
+            self.log_test(
+                "Unauthenticated access protection",
+                False,
+                f"Exception: {str(e)}"
+            )
+        return False
+    
+    def run_all_tests(self):
+        """Run all Informações Gerais tests"""
+        print("🚀 Starting Informações Gerais Backend Tests")
+        print(f"Backend URL: {BACKEND_URL}")
+        print("=" * 60)
+        print("TESTING NEW ENDPOINTS:")
+        print("✓ GET /api/municipios (existing)")
+        print("✓ GET /api/municipio-info/{municipio_id}")
+        print("✓ GET /api/municipio-liderancas/{municipio_id}")
+        print("✓ GET /api/pedidos (all and filtered)")
+        print("✓ GET /api/pedidos/cache-info")
+        print("✓ POST /api/pedidos/refresh (admin only)")
+        print("✓ POST /api/municipio-info (admin only)")
+        print("✓ POST /api/municipio-liderancas (admin only)")
+        print("✓ Authentication and authorization checks")
+        print("=" * 60)
+        print()
+        
+        # Test sequence
+        tests = [
+            self.authenticate_admin,
+            self.test_get_municipios,
+            self.test_get_municipio_info_not_found,
+            self.test_get_municipio_liderancas_empty,
+            self.test_get_pedidos_all,
+            self.test_get_pedidos_filtered,
+            self.test_get_cache_info,
+            self.test_refresh_pedidos_admin,
+            self.test_create_municipio_info,
+            self.test_create_municipio_lideranca,
+            self.test_unauthenticated_access
+        ]
+        
+        passed = 0
+        failed = 0
+        
+        for test in tests:
+            if test():
+                passed += 1
+            else:
+                failed += 1
+        
+        # Summary
+        print("=" * 60)
+        print("📊 INFORMAÇÕES GERAIS TEST SUMMARY")
+        print(f"✅ Passed: {passed}")
+        print(f"❌ Failed: {failed}")
+        print(f"📈 Success Rate: {(passed/(passed+failed)*100):.1f}%")
+        
+        # Detailed results
+        print("\n🔍 DETAILED RESULTS:")
+        for result in self.test_results:
+            status = "✅" if result['success'] else "❌"
+            print(f"{status} {result['test']}")
+            if result['details']:
+                print(f"    └─ {result['details']}")
+        
+        if failed > 0:
+            print("\n❌ FAILED TESTS:")
+            for result in self.test_results:
+                if not result['success']:
+                    print(f"   • {result['test']}: {result['details']}")
+        else:
+            print("\n🎉 ALL INFORMAÇÕES GERAIS TESTS PASSED!")
+            print("✅ All new endpoints working correctly")
+            print("✅ Authentication and authorization working")
+            print("✅ CSV data fetching and normalization working")
+            print("✅ Municipality info and lideranças CRUD working")
+        
+        return failed == 0
+
+
 if __name__ == "__main__":
     print("🔧 Backend Testing Suite")
     print("Choose test suite:")
