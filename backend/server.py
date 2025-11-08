@@ -20,6 +20,9 @@ from municipios_routes import router as municipios_router
 from liderancas_v2_routes import router as liderancas_v2_router
 from maquinarios_v2_routes import router as maquinarios_v2_router
 
+# Rotas Informações Gerais
+from municipio_info_routes import router as municipio_info_router
+
 # Auth helpers
 from auth_middleware import get_current_active_user
 from auth_models import User
