@@ -111,6 +111,16 @@ function App() {
               } 
             />
             
+            {/* Página de Informações Gerais */}
+            <Route 
+              path="/informacoes-gerais" 
+              element={
+                <ProtectedRoute>
+                  <InformacoesGerais />
+                </ProtectedRoute>
+              } 
+            />
+            
             {/* Página de Login */}
             <Route 
               path="/login" 
