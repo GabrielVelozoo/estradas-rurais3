@@ -12,6 +12,8 @@ from datetime import datetime
 
 # Get backend URL from frontend .env
 BACKEND_URL = "https://rural-infra-hub.emergent.host/api"
+# For testing new endpoints that might not be externally routed yet
+INTERNAL_BACKEND_URL = "http://localhost:8001/api"
 
 # Test credentials
 ADMIN_EMAIL = "admin@portal.gov.br"
