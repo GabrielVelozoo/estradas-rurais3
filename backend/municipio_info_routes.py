@@ -21,10 +21,11 @@ from pedidos_csv_service import get_pedidos_service
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# MongoDB connection
+# MongoDB connection - use same database as main server
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
+DB_NAME = os.getenv("DB_NAME", "test_database")
 client = AsyncIOMotorClient(MONGO_URL)
-db = client.get_database("estradas_rurais")
+db = client.get_database(DB_NAME)
 municipio_info_collection = db.get_collection("municipio_info")
 municipio_liderancas_collection = db.get_collection("municipio_liderancas")
 
