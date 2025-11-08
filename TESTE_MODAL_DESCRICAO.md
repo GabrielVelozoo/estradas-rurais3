@@ -13,7 +13,7 @@ A descrição agora **SEMPRE** aparece no modal de detalhes dos pedidos de lider
 
 ### Passo 1: Acessar a página
 ```
-URL: https://rural-connect-12.preview.emergentagent.com/pedidos-liderancas
+URL: https://ruralsystem.preview.emergentagent.com/pedidos-liderancas
 Login: gabriel
 Senha: gggr181330
 ```

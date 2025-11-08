@@ -122,7 +122,7 @@ Se o log NÃO aparecer = backend não está processando a coluna.
 ### **Teste direto da API (via curl):**
 
 ```bash
-curl -s "https://rural-connect-12.preview.emergentagent.com/api/estradas-rurais" \
+curl -s "https://ruralsystem.preview.emergentagent.com/api/estradas-rurais" \
   -H "Cookie: session=SEU_TOKEN_AQUI" | jq '.values[1][7]'
 ```
 

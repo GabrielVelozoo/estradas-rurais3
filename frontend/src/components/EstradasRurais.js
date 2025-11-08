@@ -1,104 +1,177 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useDataCache } from '../contexts/DataCacheContext';
+// frontend/src/pages/EstradasRurais.js
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
+import { useDataCache } from "../contexts/DataCacheContext";
 
-const SHEET_ID = process.env.REACT_APP_SHEET_ID;
-const API_KEY = process.env.REACT_APP_SHEETS_API_KEY;
+/* ======================= UTIL ======================= */
+function parseCurrencyToNumber(value) {
+  if (!value && value !== 0) return 0;
+  const s = value.toString().trim();
+  if (s === "") return 0;
+  const only = s.replace(/[^0-9.,-]/g, "");
+  if (only.indexOf(".") > -1 && only.indexOf(",") > -1) {
+    const cleaned = only.replace(/\./g, "").replace(/,/g, ".");
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? 0 : n;
+  }
+  if (only.indexOf(",") > -1) {
+    const cleaned = only.replace(/,/g, ".");
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? 0 : n;
+  }
+  const n = parseFloat(only);
+  return isNaN(n) ? 0 : n;
+}
 
-// Componente para linha da tabela com descrição expansível
-const TabelaLinha = ({ r, i }) => {
-  // Função para formatar data de última edição
-  const formatUltimaEdicao = (dateString) => {
-    if (!dateString || dateString === '') return null;
-    
-    try {
-      let date;
-      
-      // Se for número (serial date do Excel), converter
-      if (!isNaN(dateString) && dateString.toString().length <= 10) {
-        const excelEpoch = new Date(1899, 11, 30);
-        date = new Date(excelEpoch.getTime() + parseFloat(dateString) * 24 * 60 * 60 * 1000);
-      } else {
-        date = new Date(dateString);
-      }
-      
-      if (isNaN(date.getTime())) return null;
-      
-      // Formatar no fuso America/Sao_Paulo
-      const formatter = new Intl.DateTimeFormat('pt-BR', {
-        timeZone: 'America/Sao_Paulo',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
-      
-      return formatter.format(date);
-    } catch (error) {
-      return null;
-    }
-  };
-  
-  // Função para determinar a cor e ícone da secretaria
+function formatCurrencyBR(value) {
+  if (!value) return "R$ 0,00";
+  const num = parseCurrencyToNumber(value);
+  if (num === 0) return "R$ 0,00";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(num);
+}
+
+// Converte "dd/MM/yyyy HH:mm[:ss]" para Date local
+function parsePtBrDateString(str) {
+  if (!str) return null;
+  const v = String(str).trim();
+  const re =
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/;
+  const m = v.match(re);
+  if (m) {
+    const dd = parseInt(m[1], 10);
+    const MM = parseInt(m[2], 10);
+    const yyyy = parseInt(m[3], 10);
+    const hh = m[4] ? parseInt(m[4], 10) : 0;
+    const min = m[5] ? parseInt(m[5], 10) : 0;
+    const ss = m[6] ? parseInt(m[6], 10) : 0;
+    return new Date(yyyy, MM - 1, dd, hh, min, ss);
+  }
+  return null;
+}
+
+function formatUltimaAtualizacaoBR(value) {
+  const dt = parsePtBrDateString(value);
+  if (!dt) return null;
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(dt);
+  } catch {
+    return null;
+  }
+}
+
+// ajuda anti-tradução
+const noTranslateProps = {
+  translate: "no",
+  "data-no-translate": "true",
+  className: "",
+};
+
+// debounce
+function useDebounced(value, ms = 300) {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
+
+/* ======================= LINHA DA TABELA ======================= */
+const TabelaLinha = ({ r, onCopy }) => {
   const getSecretariaStyle = (secretaria) => {
-    switch(secretaria) {
-      case 'SEAB':
+    switch (secretaria) {
+      case "SEAB":
         return {
-          bg: 'bg-green-100',
-          text: 'text-green-800', 
-          border: 'border-green-300',
-          icon: '🌱',
-          label: 'SEAB'
+          bg: "bg-green-100 dark:bg-emerald-900/30",
+          text: "text-green-800 dark:text-emerald-300",
+          border: "border-green-300 dark:border-emerald-700",
+          icon: "🌱",
+          label: "SEAB",
         };
-      case 'SECID':
+      case "SECID":
         return {
-          bg: 'bg-blue-100',
-          text: 'text-blue-800',
-          border: 'border-blue-300', 
-          icon: '🏙️',
-          label: 'SECID'
+          bg: "bg-blue-100 dark:bg-blue-900/30",
+          text: "text-blue-800 dark:text-blue-300",
+          border: "border-blue-300 dark:border-blue-700",
+          icon: "🏙️",
+          label: "SECID",
         };
       default:
         return {
-          bg: 'bg-gray-100',
-          text: 'text-gray-600',
-          border: 'border-gray-300',
-          icon: '❓',
-          label: secretaria || 'N/A'
+          bg: "bg-gray-100 dark:bg-slate-800",
+          text: "text-gray-600 dark:text-slate-300",
+          border: "border-gray-300 dark:border-slate-700",
+          icon: "❓",
+          label: secretaria || "N/A",
         };
     }
   };
+  const secretariaStyle = getSecretariaStyle(r.secretaria);
 
-  // Função para gerar link do eProtocolo
   const gerarLinkEProtocolo = (protocolo) => {
     if (!protocolo) return null;
-    
-    // Remover todos os caracteres não-numéricos
-    const protocoloLimpo = protocolo.replace(/\D/g, '');
-    
-    // Se não tem dígitos suficientes, não criar link
+    const protocoloLimpo = protocolo.replace(/\D/g, "");
     if (protocoloLimpo.length < 6) return null;
-    
-    // URL do eProtocolo
-    const baseUrl = "https://www.eprotocolo.pr.gov.br/spiweb/consultarProtocoloDigital.do";
-    const url = `${baseUrl}?action=pesquisar&numeroProtocolo=${protocoloLimpo}`;
-    
-    return url;
+    return `https://www.eprotocolo.pr.gov.br/spiweb/consultarProtocoloDigital.do?action=pesquisar&numeroProtocolo=${protocoloLimpo}`;
   };
 
-  const secretariaStyle = getSecretariaStyle(r.secretaria);
   const linkEProtocolo = gerarLinkEProtocolo(r.protocolo);
-  
+  const ultimaFmt = r.ultimaEdicao ? formatUltimaAtualizacaoBR(r.ultimaEdicao) : null;
+
+  // chip de estado (azul para Plano de Trabalho / Plano de Trabalho Aprovado)
+  const estadoTexto = `${r.estado || ""} ${r.descricao || ""}`;
+  const isPlanoTrabalho = /(plano\s*de\s*trabalho)(\s*aprovado)?/i.test(estadoTexto);
+
+  const estadoColor = isPlanoTrabalho
+    ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200"
+    : /teste/i.test(estadoTexto)
+    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200"
+    : /nuconv|convêni|convenio/i.test(estadoTexto)
+    ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200"
+    : (r.estado || r.descricao)
+    ? "bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-slate-300"
+    : "";
+
+  // máscara para copiar protocolo
+  const maskProtocolo = (value) => {
+    const n = (value || "").replace(/\D/g, "").slice(0, 9);
+    if (n.length <= 2) return n;
+    if (n.length <= 5) return `${n.slice(0, 2)}.${n.slice(2)}`;
+    if (n.length <= 8) return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5)}`;
+    return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5, 8)}-${n.slice(8)}`;
+  };
+
   return (
-    <tr className={`transition-colors border-b border-gray-100 ${
-      r.isPrioridade 
-        ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-500' 
-        : 'hover:bg-blue-50'
-    }`}>
+    <tr
+      className={`transition-colors border-b border-gray-100 dark:border-slate-800 ${
+        r.isPrioridade
+          ? "bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 border-l-4 border-l-red-500"
+          : "hover:bg-blue-50 dark:hover:bg-slate-800/50"
+      }`}
+    >
+      {/* Município */}
       <td className="px-4 py-3 align-top">
         <div className="flex items-center gap-2">
-          <div className="font-semibold text-gray-900 text-sm break-words">
+          <div
+            {...noTranslateProps}
+            className="font-semibold text-gray-900 dark:text-slate-100 text-sm break-words"
+          >
             {r.municipio}
           </div>
           {r.isPrioridade && (
@@ -108,64 +181,90 @@ const TabelaLinha = ({ r, i }) => {
           )}
         </div>
       </td>
+
+      {/* Protocolo */}
       <td className="px-3 py-3 align-top">
-        <div className="font-mono text-xs whitespace-nowrap">
+        <div className="font-mono text-xs whitespace-nowrap flex items-center">
           {linkEProtocolo ? (
-            <a
-              href={linkEProtocolo}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer flex items-center gap-1"
-              title={`Abrir protocolo ${r.protocolo} no eProtocolo`}
-            >
-              <span className="text-xs">🔗</span>
-              {r.protocolo}
-            </a>
+            <>
+              <a
+                href={linkEProtocolo}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline transition-colors cursor-pointer flex items-center gap-1"
+                title={`Abrir protocolo ${r.protocolo} no eProtocolo`}
+                style={{ color: "#2563eb" }}
+                {...noTranslateProps}
+              >
+                <span className="text-xs">🔗</span>
+                <span>{r.protocolo}</span>
+              </a>
+              <button
+                onClick={() => onCopy(maskProtocolo(r.protocolo))}
+                className="ml-2 text-[11px] px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200"
+                title="Copiar protocolo com máscara"
+              >
+                Copiar
+              </button>
+            </>
           ) : (
-            <span className="text-gray-700">{r.protocolo}</span>
+            <span className="text-gray-700 dark:text-slate-300" {...noTranslateProps}>
+              {r.protocolo}
+            </span>
           )}
         </div>
       </td>
+
+      {/* Secretaria */}
       <td className="px-3 py-3 align-top">
         <div className="flex justify-center">
-          <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${secretariaStyle.bg} ${secretariaStyle.text} ${secretariaStyle.border}`}>
-            <span className="text-sm">{secretariaStyle.icon}</span>
-            {secretariaStyle.label}
+          <span
+            {...noTranslateProps}
+            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${getSecretariaStyle(r.secretaria).bg} ${getSecretariaStyle(r.secretaria).text} ${getSecretariaStyle(r.secretaria).border}`}
+          >
+            <span className="text-sm">{getSecretariaStyle(r.secretaria).icon}</span>
+            {getSecretariaStyle(r.secretaria).label}
           </span>
         </div>
       </td>
+
+      {/* Descrição + Última Atualização */}
       <td className="px-4 py-3 align-top">
         <div className="space-y-2">
           {r.nomeEstrada && (
-            <div className={`font-medium text-sm ${
-              r.isPrioridade ? 'text-red-900' : 'text-gray-900'
-            }`}>
+            <strong
+              className={`block font-extrabold text-sm ${
+                r.isPrioridade ? "text-red-900 dark:text-red-300" : "text-gray-900 dark:text-slate-100"
+              }`}
+              {...noTranslateProps}
+            >
               🛣️ {r.nomeEstrada}
-            </div>
+            </strong>
           )}
-          {r.estado && (
-            <div className="text-gray-600 text-sm flex items-center flex-wrap gap-1">
-              <span>{r.estado}</span>
-              {/* ✅ Última edição - inline no final da descrição, em vermelho */}
-              {r.ultimaEdicao && formatUltimaEdicao(r.ultimaEdicao) && (
-                <span className="text-red-500 text-xs font-medium ml-2 whitespace-nowrap">
-                  🕐 Última edição: {formatUltimaEdicao(r.ultimaEdicao)}
+          {(r.estado || ultimaFmt) && (
+            <div className="text-gray-600 dark:text-slate-300 text-sm flex items-center flex-wrap gap-2">
+              {(r.estado || r.descricao) && (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${estadoColor}`}>
+                  {r.estado || "—"}
+                </span>
+              )}
+              {ultimaFmt && (
+                <span className="text-red-500 dark:text-red-300 text-xs font-medium whitespace-nowrap">
+                  🕐 Ultima Atualização: {ultimaFmt}
                 </span>
               )}
             </div>
           )}
-          {/* Se não tiver estado mas tiver última edição, mostrar sozinha */}
-          {!r.estado && r.ultimaEdicao && formatUltimaEdicao(r.ultimaEdicao) && (
-            <div className="text-red-500 text-xs font-medium">
-              🕐 Última edição: {formatUltimaEdicao(r.ultimaEdicao)}
-            </div>
-          )}
         </div>
       </td>
+
+      {/* Valor */}
       <td className="px-4 py-3 text-right align-top">
-        <div className={`font-bold text-sm whitespace-nowrap ${
-          r.isPrioridade ? 'text-red-600' : 'text-green-600'
-        }`}>
+        <div
+          className={`font-bold text-sm whitespace-nowrap ${
+            r.isPrioridade ? "text-red-600" : "text-green-600 dark:text-emerald-300"
+          }`}
+        >
           {r.valor}
         </div>
       </td>
@@ -173,316 +272,205 @@ const TabelaLinha = ({ r, i }) => {
   );
 };
 
+/* ======================= PÁGINA ======================= */
 export default function EstradasRurais() {
-  // Hook de cache
-  const { fetchWithCache, clearCache } = useDataCache();
-  
-  // Função para normalizar texto (remover acentos)
-  const normalizeText = (text) => {
-    if (!text) return '';
-    return text
-      .normalize('NFD') // Decomposição Unicode
-      .replace(/[\u0300-\u036f]/g, '') // Remove diacríticos
-      .toLowerCase()
-      .trim();
-  };
-  
-  // Função para formatar data de última edição no fuso America/Sao_Paulo
-  const formatUltimaEdicao = (dateString) => {
-    if (!dateString || dateString === '') return null;
-    
-    try {
-      // Tentar parsear a data do Google Sheets
-      // Pode vir como "dd/MM/yyyy HH:mm:ss" ou timestamp
-      let date;
-      
-      // Se for número (serial date do Excel), converter
-      if (!isNaN(dateString) && dateString.toString().length <= 10) {
-        // Serial date do Excel (dias desde 1899-12-30)
-        const excelEpoch = new Date(1899, 11, 30);
-        date = new Date(excelEpoch.getTime() + parseFloat(dateString) * 24 * 60 * 60 * 1000);
-      } else {
-        // Tentar como string de data
-        date = new Date(dateString);
-      }
-      
-      // Verificar se a data é válida
-      if (isNaN(date.getTime())) return null;
-      
-      // Formatar no fuso America/Sao_Paulo
-      const formatter = new Intl.DateTimeFormat('pt-BR', {
-        timeZone: 'America/Sao_Paulo',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
-      
-      return formatter.format(date);
-    } catch (error) {
-      console.warn('Erro ao formatar data:', dateString, error);
-      return null;
-    }
-  };
+  const { fetchWithCache } = useDataCache();
 
-  // Funções para máscara de protocolo
-  const formatProtocolo = (value) => {
-    // Remove todos os caracteres não numéricos
-    const numbers = value.replace(/\D/g, '');
-    
-    // Limita a 9 dígitos
-    const limitedNumbers = numbers.slice(0, 9);
-    
-    // Aplica a máscara XX.XXX.XXX-X
-    if (limitedNumbers.length <= 2) {
-      return limitedNumbers;
-    } else if (limitedNumbers.length <= 5) {
-      return `${limitedNumbers.slice(0, 2)}.${limitedNumbers.slice(2)}`;
-    } else if (limitedNumbers.length <= 8) {
-      return `${limitedNumbers.slice(0, 2)}.${limitedNumbers.slice(2, 5)}.${limitedNumbers.slice(5)}`;
-    } else {
-      return `${limitedNumbers.slice(0, 2)}.${limitedNumbers.slice(2, 5)}.${limitedNumbers.slice(5, 8)}-${limitedNumbers.slice(8)}`;
-    }
-  };
-
-  const extractNumbers = (protocolo) => {
-    return protocolo.replace(/\D/g, '');
-  };
-
-  const validateProtocolo = (protocolo) => {
-    const numbers = extractNumbers(protocolo);
-    if (numbers.length === 0) {
-      return { valid: true, error: "" }; // Campo vazio é válido
-    }
-    if (numbers.length < 9) {
-      return { valid: false, error: `Protocolo incompleto (${numbers.length}/9 dígitos)` };
-    }
-    if (numbers.length > 9) {
-      return { valid: false, error: `Protocolo muito longo (${numbers.length}/9 dígitos)` };
-    }
-    return { valid: true, error: "" };
-  };
-
-  const handleProtocoloChange = (e) => {
-    const inputValue = e.target.value;
-    const formatted = formatProtocolo(inputValue);
-    const validation = validateProtocolo(formatted);
-    
-    setFiltroProtocolo(formatted);
-    setProtocoloError(validation.error);
-    setPage(1); // Resetar página quando filtro muda
-  };
-
-  // Estados principais
+  // filtros/estado
   const [dados, setDados] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [busca, setBusca] = useState("");
   const [buscaEstrada, setBuscaEstrada] = useState("");
+  const [filtroSecretaria, setFiltroSecretaria] = useState("");
   const [filtroProtocolo, setFiltroProtocolo] = useState("");
   const [protocoloError, setProtocoloError] = useState("");
-  const [apensPrioridades, setApenasPrioridades] = useState(false);
-  const [filtroSecretaria, setFiltroSecretaria] = useState(""); // "SEAB", "SECID", ou "" (todos)
+  const [apenasPrioridades, setApenasPrioridades] = useState(false);
   const [sortBy, setSortBy] = useState("municipio");
   const [sortDir, setSortDir] = useState("asc");
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
-  const [autoRefresh, setAutoRefresh] = useState(true); // ✅ Ativado por padrão
-  const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState(30); // ✅ 30s para capturar mudanças da planilha
-  const [ultimaAtualizacao, setUltimaAtualizacao] = useState(null); // ✅ Timestamp da última atualização
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState(30);
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState(null);
   const intervalRef = useRef(null);
 
-  const fetchData = useCallback(async (forceFresh = false) => {
-    setCarregando(true);
-    setErro(null);
-    
+  // DARK MODE (persistência + prefers)
+  const THEME_KEY = "ui_theme";
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (dark) root.classList.add("dark");
+    else root.classList.remove("dark");
     try {
-      const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-      
-      // Usar cache para dados do Google Sheets (slow operation)
-      const data = await fetchWithCache(
-        'estradas-rurais',
-        async (signal) => {
-          const res = await fetch(`${BACKEND_URL}/api/estradas-rurais`, { signal });
-          if (!res.ok) throw new Error(`Erro na requisição: ${res.status} ${res.statusText}`);
-          return await res.json();
-        },
-        { 
-          forceFresh,
-          ttl: 3 * 60 * 1000 // Cache por 3 minutos (dados mudam com menos frequência)
-        }
-      );
-      
-      if (!data.values) {
-        setDados([]);
-        setErro("Planilha retornou sem valores (data.values está vazio). Verifique permissões e intervalo A:F");
+      localStorage.setItem(THEME_KEY, dark ? "dark" : "light");
+    } catch {}
+  }, [dark]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(THEME_KEY);
+      if (saved === "dark" || saved === "light") {
+        setDark(saved === "dark");
         return;
       }
-      
-      // 🔍 DEBUG: Log dos dados brutos recebidos
-      console.log('📊 DADOS RECEBIDOS DO BACKEND:');
-      console.log('  - Total de linhas no array:', data.values.length);
-      console.log('');
-      console.log('🔍 Primeiras 4 linhas do Sheets:');
-      for (let i = 0; i < Math.min(4, data.values.length); i++) {
-        const row = data.values[i];
-        console.log(`  Linha ${i}:`, {
-          totalColunas: row.length,
-          primeiraColuna: row[0],
-          colunaH: row[7],
-          linhaCompleta: row
-        });
-      }
-      console.log('');
-      
-      // Identificar qual linha é o header real
-      const linhaHeader = data.values[0];
-      const segundaLinha = data.values[1];
-      const terceiraLinha = data.values[2];
-      
-      console.log('🔍 Análise das primeiras linhas:');
-      console.log('  Linha 0 (primeira):', linhaHeader[0], '→', linhaHeader[7]);
-      console.log('  Linha 1 (segunda):', segundaLinha?.[0], '→', segundaLinha?.[7]);
-      console.log('  Linha 2 (terceira):', terceiraLinha?.[0], '→', terceiraLinha?.[7]);
-      console.log('');
-      
-      // Detectar se linha 1 é header (tem "MUNICÍPIO" ou similar)
-      const primeiraLinhaEHeader = linhaHeader[0]?.toString().toUpperCase().includes('MUNIC');
-      const segundaLinhaEHeader = segundaLinha?.[0]?.toString().toUpperCase().includes('MUNIC');
-      
-      console.log('🔍 Detecção de header:');
-      console.log('  Linha 0 é header?', primeiraLinhaEHeader);
-      console.log('  Linha 1 é header?', segundaLinhaEHeader);
-      console.log('');
-      
-      // ✅ 2) Detectar automaticamente qual é a coluna de prioridade
-      const header = data.values[1].map(h => (h || '').toString().trim().toLowerCase());
-      let priIndex = header.findIndex(h => h.includes('priorid') || h.includes('priorit'));
-      if (priIndex === -1) priIndex = 6; // Fallback para coluna G
-      
-      console.log('📋 HEADER usado:', header);
-      console.log('📋 priIndex:', priIndex);
-      console.log('');
+    } catch {}
+    const prefers =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches;
+    setDark(!!prefers);
+  }, []);
 
-      // ✅ 3) Monte as linhas corretamente - COMEÇAR DA LINHA 2 (terceira linha)
-      const allRows = data.values.slice(2)
-        .filter((c) => {
-          // Incluir linha se tem dados significativos
-          const municipio = (c[0] || "").toString().trim();
-          const protocolo = (c[1] || "").toString().trim();
-          const descricao = (c[4] || "").toString().trim();
-          const valor = (c[5] || "").toString().trim();
-          
-          // Filtrar apenas linhas de controle específicas
-          if (municipio.toUpperCase() === "VALOR TOTAL" || 
-              municipio.toUpperCase() === "MUNICÍPIO" ||
-              municipio.toUpperCase().includes("ULTIMA ATUALIZAÇÃO")) {
-            return false;
-          }
-          
-          return municipio !== "" || protocolo !== "" || descricao !== "" || valor !== "";
-        })
-        .map((c, index) => {
-          const municipio = (c[0] || "").toString().trim();
-          const protocolo = (c[1] || "").toString().trim();
-          const secretaria = (c[2] || "").toString().trim().toUpperCase(); // SECRETARIA substituiu prefeito
-          const estado = (c[3] || "").toString().trim();
-          const descricao = (c[4] || "").toString().trim();
-          const valor = (c[5] || "").toString().trim();
-          const prioridadeCell = (c[priIndex] || "").toString().trim().toLowerCase();
-          const ultimaEdicao = (c[7] || "").toString().trim(); // ✅ Coluna H - Última edição
-          
-          // Debug detalhado: log das primeiras 3 linhas
-          if (index < 3) {
-            console.log(`🔍 LINHA ${index + 1}:`, {
-              totalColunas: c.length,
-              municipio,
-              'coluna[7]': c[7],
-              'ultimaEdicao': ultimaEdicao,
-              'temValor': !!ultimaEdicao
+  // toast
+  const [toast, setToast] = useState("");
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 1800);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // máscara/validação do protocolo (para o input)
+  const formatProtocoloMask = (value) => {
+    const numbers = (value || "").replace(/\D/g, "");
+    const n = numbers.slice(0, 9);
+    if (n.length <= 2) return n;
+    if (n.length <= 5) return `${n.slice(0, 2)}.${n.slice(2)}`;
+    if (n.length <= 8)
+      return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5)}`;
+    return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5, 8)}-${n.slice(8)}`;
+  };
+  const extractNumbers = (s) => (s || "").replace(/\D/g, "");
+  const validateProtocolo = (prot) => {
+    const numbers = extractNumbers(prot);
+    if (numbers.length === 0) return { valid: true, error: "" };
+    if (numbers.length < 9)
+      return {
+        valid: false,
+        error: `Protocolo incompleto (${numbers.length}/9 dígitos)`,
+      };
+    if (numbers.length > 9)
+      return {
+        valid: false,
+        error: `Protocolo muito longo (${numbers.length}/9 dígitos)`,
+      };
+    return { valid: true, error: "" };
+  };
+  const handleProtocoloChange = (e) => {
+    const formatted = formatProtocoloMask(e.target.value);
+    const { error } = validateProtocolo(formatted);
+    setFiltroProtocolo(formatted);
+    setProtocoloError(error);
+    setPage(1);
+  };
+
+  const fetchData = useCallback(
+    async (forceFresh = false) => {
+      setCarregando(true);
+      setErro(null);
+      try {
+        const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+        const data = await fetchWithCache(
+          "estradas-rurais",
+          async (signal) => {
+            const res = await fetch(`${BACKEND_URL}/api/estradas-rurais`, {
+              signal,
             });
+            if (!res.ok)
+              throw new Error(`Erro na requisição: ${res.status} ${res.statusText}`);
+            return await res.json();
+          },
+          { forceFresh, ttl: 3 * 60 * 1000 }
+        );
+
+        if (!data.values) {
+          setDados([]);
+          setErro(
+            "Planilha sem valores (data.values vazio). Verifique permissões e intervalo A:H"
+          );
+          setCarregando(false);
+          return;
+        }
+
+        const allRows = data.values
+          .slice(2)
+          .filter((c) => {
+            const municipio = (c[0] || "").toString().trim();
+            const descricao = (c[4] || "").toString().trim();
+            const valor = (c[5] || "").toString().trim();
+            if (
+              municipio.toUpperCase() === "VALOR TOTAL" ||
+              municipio.toUpperCase() === "MUNICÍPIO" ||
+              municipio.toUpperCase().includes("ULTIMA ATUALIZAÇÃO")
+            )
+              return false;
+            return municipio !== "" || descricao !== "" || valor !== "";
+          })
+          .map((c) => {
+            const municipio = (c[0] || "").toString().trim();
+            const protocolo = (c[1] || "").toString().trim();
+            const secretaria = (c[2] || "").toString().trim().toUpperCase();
+            const estado = (c[3] || "").toString().trim();
+            const descricao = (c[4] || "").toString().trim();
+            const valor = (c[5] || "").toString().trim();
+            const prioridadeRaw = (c[6] || "").toString().trim().toLowerCase();
+            const ultimaEdicao = (c[7] || "").toString().trim();
+
+            return {
+              municipio: municipio || "Não informado",
+              protocolo,
+              secretaria,
+              estado,
+              descricao,
+              nomeEstrada: descricao,
+              valor: formatCurrencyBR(valor),
+              _valorNum: parseCurrencyToNumber(valor),
+              prioridadeRaw,
+              isPrioridade:
+                prioridadeRaw.includes("priorid") ||
+                prioridadeRaw.includes("priorit") ||
+                prioridadeRaw.includes("sim"),
+              ultimaEdicao,
+            };
+          });
+
+        // 1 prioridade por município quando necessário
+        const used = new Set();
+        const hasExplicit = {};
+        allRows.forEach((r) => {
+          const k = r.municipio.toLowerCase();
+          if (!hasExplicit[k]) hasExplicit[k] = false;
+          if (r.isPrioridade) hasExplicit[k] = true;
+        });
+        allRows.forEach((r) => {
+          const k = r.municipio.toLowerCase();
+          if (r.isPrioridade && !used.has(k)) used.add(k);
+          else r.isPrioridade = false;
+        });
+        allRows.forEach((r) => {
+          const k = r.municipio.toLowerCase();
+          if (!hasExplicit[k] && !used.has(k) && r.municipio !== "Não informado") {
+            r.isPrioridade = true;
+            used.add(k);
           }
-          
-          return {
-            municipio: municipio || "Não informado",
-            protocolo: protocolo,
-            secretaria: secretaria, // SECRETARIA substituiu prefeito
-            estado: estado,
-            descricao: descricao,
-            nomeEstrada: descricao, // Usando descrição como nome da estrada
-            valor: formatCurrency(valor),
-            _valorNum: parseCurrencyToNumber(valor),
-            prioridadeRaw: prioridadeCell,
-            prioridade: prioridadeCell.includes('priorid') || prioridadeCell.includes('priorit'),
-            isPrioridade: false, // Será definido abaixo
-            ultimaEdicao: ultimaEdicao // ✅ Última edição da planilha
-          };
         });
 
-      console.log('rows com prioridade:', allRows.filter(r => r.prioridadeRaw));
-
-      // ✅ 4) Garantir que cada município tenha apenas 1 prioridade
-      const municipioTemPrioridade = {};
-      allRows.forEach(r => {
-        const key = r.municipio.toLowerCase();
-        if (!municipioTemPrioridade[key]) municipioTemPrioridade[key] = false;
-        if (r.prioridade) municipioTemPrioridade[key] = true;
-      });
-
-      const usado = new Set();
-      // Primeiro passo: marcar as que já têm "prioridade" explícita
-      allRows.forEach(r => {
-        const key = r.municipio.toLowerCase();
-        r.isPrioridade = false;
-        if (r.prioridade && !usado.has(key)) {
-          r.isPrioridade = true;
-          usado.add(key);
+        setDados(allRows);
+        setUltimaAtualizacao(new Date());
+      } catch (e) {
+        if (e.name === "AbortError") {
+          console.log("[Estradas Rurais] Requisição cancelada");
+          return;
         }
-      });
-
-      // Segundo passo: para municípios sem prioridade explícita, marcar a primeira entrada
-      allRows.forEach(r => {
-        const key = r.municipio.toLowerCase();
-        if (municipioTemPrioridade[key] && !usado.has(key) && r.municipio !== "Não informado") {
-          r.isPrioridade = true;
-          usado.add(key);
-        }
-      });
-
-      const rows = allRows;
-      
-      // 🔍 DEBUG: Estatísticas detalhadas
-      const totalLinhas = rows.length;
-      const linhasComUltimaEdicao = rows.filter(r => r.ultimaEdicao && r.ultimaEdicao !== '').length;
-      const percentual = totalLinhas > 0 ? Math.round((linhasComUltimaEdicao / totalLinhas) * 100) : 0;
-      
-      console.log('📊 ESTATÍSTICAS FINAIS:');
-      console.log(`  ✅ Total de linhas processadas: ${totalLinhas}`);
-      console.log(`  ✅ Linhas com ultimaEdicao: ${linhasComUltimaEdicao} (${percentual}%)`);
-      console.log(`  ⚠️ Linhas SEM ultimaEdicao: ${totalLinhas - linhasComUltimaEdicao}`);
-      console.log('');
-      console.log('🔍 Primeiras 5 linhas com ultimaEdicao:');
-      rows.filter(r => r.ultimaEdicao).slice(0, 5).forEach((r, i) => {
-        console.log(`  ${i + 1}. ${r.municipio}: ${r.ultimaEdicao}`);
-      });
-      
-      console.log('total prioridades finais:', rows.filter(r => r.isPrioridade).length);
-      setDados(rows);
-      setUltimaAtualizacao(new Date()); // ✅ Registrar quando os dados foram atualizados
-      setCarregando(false);
-    } catch (e) {
-      if (e.name === 'AbortError') {
-        console.log('[Estradas Rurais] Requisição cancelada');
-        return;
+        console.error(e);
+        setErro(e.message || String(e));
+      } finally {
+        setCarregando(false);
       }
-      
-      console.error(e);
-      setErro(e.message || String(e));
-      setCarregando(false);
-    }
-  }, [fetchWithCache]);
+    },
+    [fetchWithCache]
+  );
 
   useEffect(() => {
     fetchData();
@@ -494,8 +482,10 @@ export default function EstradasRurais() {
   useEffect(() => {
     if (autoRefresh) {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      // Force fresh data on auto-refresh
-      intervalRef.current = setInterval(() => fetchData(true), Math.max(5, refreshIntervalSeconds) * 1000);
+      intervalRef.current = setInterval(
+        () => fetchData(true),
+        Math.max(5, refreshIntervalSeconds) * 1000
+      );
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current);
     }
@@ -504,62 +494,35 @@ export default function EstradasRurais() {
     };
   }, [autoRefresh, refreshIntervalSeconds, fetchData]);
 
-  function parseCurrencyToNumber(value) {
-    if (!value && value !== 0) return 0;
-    const s = value.toString().trim();
-    if (s === "") return 0;
-    const only = s.replace(/[^0-9.,-]/g, "");
-    if (only.indexOf(".") > -1 && only.indexOf(",") > -1) {
-      const cleaned = only.replace(/\./g, "").replace(/,/g, ".");
-      const n = parseFloat(cleaned);
-      return isNaN(n) ? 0 : n;
-    }
-    if (only.indexOf(",") > -1) {
-      const cleaned = only.replace(/,/g, ".");
-      const n = parseFloat(cleaned);
-      return isNaN(n) ? 0 : n;
-    }
-    const n = parseFloat(only);
-    return isNaN(n) ? 0 : n;
-  }
-
-  function formatCurrency(value) {
-    if (!value) return "R$ 0,00";
-    const num = parseCurrencyToNumber(value);
-    if (num === 0) return "R$ 0,00";
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(num);
-  }
-
-  // Estados removidos dos filtros conforme solicitado
+  // debounce nos filtros
+  const buscaDeb = useDebounced(busca, 250);
+  const buscaEstradaDeb = useDebounced(buscaEstrada, 250);
 
   const filtrados = useMemo(() => {
-    const lowerBusca = busca.trim().toLowerCase();
-    const lowerBuscaEstrada = buscaEstrada.trim().toLowerCase();
+    const lb = (buscaDeb || "").toLowerCase();
+    const le = (buscaEstradaDeb || "").toLowerCase();
+    const numFiltro = (filtroProtocolo || "").replace(/\D/g, "");
+
     let out = dados.filter((d) => {
-      if (lowerBusca && !d.municipio.toLowerCase().includes(lowerBusca)) return false;
-      if (lowerBuscaEstrada) {
-        const buscaEstradaMatch = (d.nomeEstrada && d.nomeEstrada.toLowerCase().includes(lowerBuscaEstrada)) ||
-                                  (d.descricao && d.descricao.toLowerCase().includes(lowerBuscaEstrada));
-        if (!buscaEstradaMatch) return false;
-      }
-      // Filtro por prioridades
-      if (apensPrioridades && !d.isPrioridade) return false;
-      
-      // Filtro por secretaria
+      if (lb && !d.municipio.toLowerCase().includes(lb)) return false;
+      if (
+        le &&
+        !(
+          (d.nomeEstrada && d.nomeEstrada.toLowerCase().includes(le)) ||
+          (d.descricao && d.descricao.toLowerCase().includes(le))
+        )
+      )
+        return false;
+      if (apenasPrioridades && !d.isPrioridade) return false;
       if (filtroSecretaria && d.secretaria !== filtroSecretaria) return false;
-      
-      // Filtro por protocolo (compara apenas números)
-      if (filtroProtocolo) {
-        const numBusca = extractNumbers(filtroProtocolo);
-        const numProtocolo = extractNumbers(d.protocolo || '');
-        if (!numProtocolo.includes(numBusca)) return false;
+
+      if (numFiltro) {
+        const numProt = (d.protocolo || "").replace(/\D/g, "");
+        if (!numProt.includes(numFiltro)) return false;
       }
-      
       return true;
     });
+
     out.sort((a, b) => {
       let va = a[sortBy];
       let vb = b[sortBy];
@@ -574,23 +537,57 @@ export default function EstradasRurais() {
       if (va > vb) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
+
     return out;
-  }, [dados, busca, buscaEstrada, filtroProtocolo, apensPrioridades, filtroSecretaria, sortBy, sortDir]);
+  }, [
+    dados,
+    buscaDeb,
+    buscaEstradaDeb,
+    filtroProtocolo,
+    apenasPrioridades,
+    filtroSecretaria,
+    sortBy,
+    sortDir,
+  ]);
 
   const total = filtrados.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   useEffect(() => {
     if (page > totalPages) setPage(1);
   }, [totalPages, page]);
+
   const pageData = useMemo(() => {
     const start = (page - 1) * pageSize;
     return filtrados.slice(start, start + pageSize);
   }, [filtrados, page, pageSize]);
 
+  const sumFilteredValues = useMemo(
+    () => filtrados.reduce((acc, r) => acc + (r._valorNum || 0), 0),
+    [filtrados]
+  );
+
   const exportCSV = () => {
-    const headers = ["Município", "Protocolo", "Secretaria", "Estado", "Descrição", "Valor"];
-    const rows = filtrados.map((r) => [r.municipio, r.protocolo, r.secretaria, r.estado, r.descricao, r.valor]);
-    const csvContent = [headers, ...rows].map((e) => e.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const headers = [
+      "Município",
+      "Protocolo",
+      "Secretaria",
+      "Situação",
+      "Descrição",
+      "Valor",
+      "Ultima Atualização",
+    ];
+    const rows = filtrados.map((r) => [
+      r.municipio,
+      r.protocolo,
+      r.secretaria,
+      r.estado,
+      r.descricao,
+      r.valor,
+      r.ultimaEdicao || "",
+    ]);
+    const csvContent = [headers, ...rows]
+      .map((e) => e.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -598,15 +595,82 @@ export default function EstradasRurais() {
     a.download = "estradas_rurais_export.csv";
     a.click();
     URL.revokeObjectURL(url);
+    setToast("CSV exportado!");
+  };
+
+  const imprimir = () => {
+    const dataAtual = new Date().toLocaleDateString("pt-BR");
+    const horaAtual = new Date().toLocaleTimeString("pt-BR");
+
+    const conteudo = `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Relatório de Estradas</title>
+          <style>
+            @page { margin: 2cm; size: A4; }
+            body { font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .header h1 { margin: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+            th { background: #f2f2f2; }
+            .valor { text-align: right; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>🛣️ Relatório de Estradas Rurais</h1>
+            <div>Data/Hora: ${dataAtual} ${horaAtual}</div>
+            <div>Total: ${filtrados.length} | Valor total: ${sumFilteredValues.toLocaleString(
+              "pt-BR",
+              { style: "currency", currency: "BRL" }
+            )}</div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Município</th>
+                <th>Protocolo</th>
+                <th>Secretaria</th>
+                <th>Descrição/Situação</th>
+                <th>Ultima Atualização</th>
+                <th>Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filtrados
+                .map(
+                  (r) => `
+                <tr>
+                  <td>${r.municipio}</td>
+                  <td>${r.protocolo || "-"}</td>
+                  <td>${r.secretaria || "-"}</td>
+                  <td>${r.descricao || r.nomeEstrada || "-"}</td>
+                  <td>${r.ultimaEdicao || "-"}</td>
+                  <td class="valor">${r.valor}</td>
+                </tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+    const w = window.open("", "_blank");
+    w.document.write(conteudo);
+    w.document.close();
+    w.focus();
+    w.print();
   };
 
   const clearFilters = () => {
     setBusca("");
     setBuscaEstrada("");
+    setFiltroSecretaria("");
     setFiltroProtocolo("");
     setProtocoloError("");
     setApenasPrioridades(false);
-    setFiltroSecretaria("");
   };
 
   const toggleSort = (col) => {
@@ -618,126 +682,72 @@ export default function EstradasRurais() {
     }
   };
 
-  const sumFilteredValues = useMemo(() => filtrados.reduce((acc, r) => acc + (r._valorNum || 0), 0), [filtrados]);
+  const totalSeab = useMemo(
+    () => dados.filter((d) => d.secretaria === "SEAB").length,
+    [dados]
+  );
+  const totalSecid = useMemo(
+    () => dados.filter((d) => d.secretaria === "SECID").length,
+    [dados]
+  );
 
-  // Função para imprimir os registros atuais
-  const imprimirRegistros = () => {
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
-    const horaAtual = new Date().toLocaleTimeString('pt-BR');
-    
-    let conteudoHTML = `
-      <html>
-        <head>
-          <title>Relatório de Estradas Rurais</title>
-          <meta charset="utf-8">
-          <style>
-            @page { margin: 2cm; size: A4; }
-            body { font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; }
-            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-            .header h1 { margin: 0; color: #333; font-size: 24px; }
-            .info { background: #f5f5f5; padding: 10px; margin: 20px 0; border-radius: 5px; }
-            .filtros { margin: 20px 0; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; font-weight: bold; }
-            .prioridade { background-color: #fee; }
-            .prioridade-badge { color: #d00; font-weight: bold; }
-            .valor { text-align: right; font-weight: bold; }
-            .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #666; }
-            .break-word { word-wrap: break-word; max-width: 200px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>🛣️ Relatório de Estradas Rurais</h1>
-            <p>Portal Municipal de Investimentos</p>
-          </div>
-          
-          <div class="info">
-            <strong>📊 Resumo do Relatório:</strong><br>
-            • Total de registros: ${filtrados.length}<br>
-            • Valor total: ${formatNumber(sumFilteredValues)}<br>
-            • Data/Hora: ${dataAtual} às ${horaAtual}<br>
-            ${apensPrioridades ? '• <span class="prioridade-badge">Apenas PRIORIDADES</span>' : ''}
-          </div>`;
-
-    if (busca || buscaEstrada || filtroProtocolo || apensPrioridades) {
-      conteudoHTML += `
-        <div class="filtros">
-          <strong>🔍 Filtros Aplicados:</strong><br>
-          ${busca ? `• Município: "${busca}"<br>` : ''}
-          ${buscaEstrada ? `• Nome da Estrada: "${buscaEstrada}"<br>` : ''}
-          ${filtroProtocolo ? `• Protocolo: "${filtroProtocolo}"<br>` : ''}
-          ${apensPrioridades ? '• Mostrando apenas PRIORIDADES<br>' : ''}
-        </div>`;
-    }
-
-    conteudoHTML += `
-          <table>
-            <thead>
-              <tr>
-                <th>Município</th>
-                <th>Protocolo</th>
-                <th>Nome da Estrada</th>
-                <th>Situação</th>
-                <th>Valor</th>
-              </tr>
-            </thead>
-            <tbody>`;
-
-    filtrados.forEach((registro) => {
-      conteudoHTML += `
-        <tr class="${registro.isPrioridade ? 'prioridade' : ''}">
-          <td>
-            ${registro.municipio}
-            ${registro.isPrioridade ? '<br><span class="prioridade-badge">PRIORIDADE</span>' : ''}
-          </td>
-          <td>${registro.protocolo || '-'}</td>
-          <td class="break-word">${registro.nomeEstrada || '-'}</td>
-          <td class="break-word">${registro.descricao || '-'}</td>
-          <td class="valor">${registro.valor}</td>
-        </tr>`;
-    });
-
-    conteudoHTML += `
-            </tbody>
-          </table>
-          
-          <div class="footer">
-            <p>Relatório gerado pelo Portal Municipal - Sistema de Estradas Rurais</p>
-            <p>Total de ${filtrados.length} registro(s) | Valor Total: ${formatNumber(sumFilteredValues)}</p>
-          </div>
-        </body>
-      </html>`;
-
-    const janelaImpressao = window.open('', '_blank');
-    janelaImpressao.document.write(conteudoHTML);
-    janelaImpressao.document.close();
-    janelaImpressao.focus();
-    janelaImpressao.print();
-  };
+  // header sticky shadow
+  const tableWrapRef = useRef(null);
+  useEffect(() => {
+    const el = tableWrapRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const th = el.querySelector("thead");
+      if (!th) return;
+      if (el.scrollTop > 0) th.classList.add("shadow");
+      else th.classList.remove("shadow");
+    };
+    el.addEventListener("scroll", onScroll);
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-4 md:p-6">
+    <div
+      className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-slate-900 dark:to-slate-900 p-4 md:p-6"
+      {...noTranslateProps}
+    >
+      {/* toast */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50 px-3 py-2 rounded-lg bg-black/80 text-white text-sm">
+          {toast}
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto">
-        {/* Header Principal */}
-        <header className="bg-white rounded-xl shadow-lg p-6 mb-6 border-l-4 border-blue-600">
+        {/* Header */}
+        <header className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 mb-6 border-l-4 border-blue-600 dark:border-blue-500">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-800 flex items-center gap-3">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-800 dark:text-slate-100 flex items-center gap-3">
                 🛣️ Estradas Rurais
               </h1>
-              <p className="text-gray-600 mt-2 text-lg flex items-center gap-2">
+              <p className="text-gray-600 dark:text-slate-300 mt-2 text-lg flex items-center gap-2">
                 Painel de Investimentos Municipais
                 {ultimaAtualizacao && (
-                  <span className="text-sm text-blue-600 font-medium ml-2 flex items-center gap-1">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <span className="text-sm text-blue-600 dark:text-blue-300 font-medium ml-2 flex items-center gap-1">
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
                     </svg>
-                    Atualizado: {ultimaAtualizacao.toLocaleTimeString('pt-BR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      second: '2-digit'
+                    Atualizado:{" "}
+                    {ultimaAtualizacao.toLocaleTimeString("pt-BR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
                     })}
                     {autoRefresh && <span className="animate-pulse">⚡</span>}
                   </span>
@@ -745,330 +755,303 @@ export default function EstradasRurais() {
               </p>
             </div>
             <div className="flex gap-3 flex-wrap">
-              <button 
-                onClick={() => fetchData(true)} 
+              <button
+                onClick={() => fetchData(true)}
                 className="px-4 py-2 rounded-lg bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                title="Atualizar dados da planilha agora"
+                title="Atualizar dados agora"
               >
                 🔄 Atualizar Agora
               </button>
-              <button 
-                onClick={() => setApenasPrioridades(!apensPrioridades)}
+
+              <button
+                onClick={() => setApenasPrioridades(!apenasPrioridades)}
                 className={`px-4 py-2 rounded-lg shadow-lg transition-colors flex items-center gap-2 ${
-                  apensPrioridades 
-                    ? 'bg-red-600 text-white hover:bg-red-700' 
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  apenasPrioridades
+                    ? "bg-red-600 text-white hover:bg-red-700"
+                    : "bg-gray-200 dark:bg-slate-700 dark:text-slate-100 text-gray-700 hover:bg-gray-300"
                 }`}
               >
-                {apensPrioridades ? 'Mostrando Prioridades' : 'Ver Prioridades'}
+                {apenasPrioridades ? "Mostrando Prioridades" : "Ver Prioridades"}
               </button>
-              <button 
-                onClick={imprimirRegistros} 
-                className="px-4 py-2 rounded-lg bg-purple-600 text-white shadow-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+
+              <button
+                onClick={imprimir}
+                className="px-4 py-2 rounded-lg bg-purple-600 text-white shadow-lg hover:bg-purple-700 transition-colors"
               >
                 🖨️ Imprimir
               </button>
-              <button 
-                onClick={exportCSV} 
-                className="px-4 py-2 rounded-lg bg-green-600 text-white shadow-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+
+              <button
+                onClick={exportCSV}
+                className="px-4 py-2 rounded-lg bg-green-600 text-white shadow-lg hover:bg-green-700 transition-colors"
               >
                 📥 Exportar CSV
+              </button>
+
+              {/* toggle dark mode */}
+              <button
+                onClick={() => setDark((v) => !v)}
+                className="px-3 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100"
+                title="Alternar modo escuro"
+                aria-pressed={dark}
+              >
+                {dark ? "🌙 Dark ON" : "☀️ Dark OFF"}
               </button>
             </div>
           </div>
         </header>
 
-        {/* Estatísticas Resumo */}
+        {/* Cards resumo */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total de Registros</p>
-                <p className="text-2xl font-bold text-gray-900">{total}</p>
-              </div>
-              <div className="text-3xl">📊</div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-blue-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Municípios Únicos</p>
-                <p className="text-2xl font-bold text-gray-900">{new Set(dados.map(d => d.municipio)).size}</p>
-              </div>
-              <div className="text-3xl">🏛️</div>
-            </div>
-          </div>
+          <ResumoCard titulo="Total de Registros" valor={total} emoji="📊" cor="green" />
+          <ResumoCard
+            titulo="Municípios Únicos"
+            valor={new Set(dados.map((d) => d.municipio)).size}
+            emoji="🏛️"
+            cor="blue"
+          />
+          <ResumoCard
+            titulo="Valor Total"
+            valor={sumFilteredValues.toLocaleString("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            })}
+            emoji="💰"
+            cor="yellow"
+          />
+          <ResumoCard
+            titulo="Estradas Prioritárias"
+            valor={dados.filter((d) => d.isPrioridade).length}
+            emoji="🎯"
+            cor="red"
+          />
+        </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-yellow-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Valor Total</p>
-                <p className="text-xl font-bold text-green-600">{formatNumber(sumFilteredValues)}</p>
-              </div>
-              <div className="text-3xl">💰</div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-red-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Estradas Prioritárias</p>
-                <p className="text-2xl font-bold text-red-600">{dados.filter(d => d.isPrioridade).length}</p>
-              </div>
-              <div className="text-3xl">🎯</div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">SEAB (Agricultura)</p>
-                <p className="text-2xl font-bold text-green-600">{dados.filter(d => d.secretaria === 'SEAB').length}</p>
-              </div>
-              <div className="text-3xl">🌱</div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-blue-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">SECID (Cidades)</p>
-                <p className="text-2xl font-bold text-blue-600">{dados.filter(d => d.secretaria === 'SECID').length}</p>
-              </div>
-              <div className="text-3xl">🏙️</div>
-            </div>
-          </div>
+        {/* Contagem por secretaria */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <ResumoCard
+            titulo="SEAB (Agricultura)"
+            valor={dados.filter((d) => d.secretaria === "SEAB").length}
+            emoji="🌱"
+            cor="green"
+          />
+          <ResumoCard
+            titulo="SECID (Cidades)"
+            valor={dados.filter((d) => d.secretaria === "SECID").length}
+            emoji="🏙️"
+            cor="blue"
+          />
         </div>
 
         {/* Filtros */}
-        <section className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <section className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100 mb-4 flex items-center gap-2">
             🔍 Filtros de Busca
           </h2>
-          
-          {/* Filtros por Secretaria - Destaque */}
-          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border border-gray-200">
-            <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+
+          {/* Secretaria */}
+          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-green-50 dark:from-slate-700/40 dark:to-slate-700/20 rounded-lg border border-gray-200 dark:border-slate-700">
+            <h3 className="text-sm font-bold text-gray-700 dark:text-slate-200 mb-3 flex items-center gap-2">
               🏢 Filtrar por Secretaria
             </h3>
             <div className="flex gap-3 flex-wrap">
-              <button 
+              <BotaoFiltro
+                ativo={filtroSecretaria === ""}
                 onClick={() => setFiltroSecretaria("")}
-                className={`px-4 py-2 rounded-lg shadow transition-colors flex items-center gap-2 text-sm font-bold ${
-                  filtroSecretaria === ""
-                    ? 'bg-gray-600 text-white' 
-                    : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                }`}
-              >
-                📊 TODAS
-                {filtroSecretaria === "" && <span className="text-xs">✓</span>}
-              </button>
-              <button 
-                onClick={() => setFiltroSecretaria(filtroSecretaria === "SEAB" ? "" : "SEAB")}
-                className={`px-4 py-2 rounded-lg shadow transition-colors flex items-center gap-2 text-sm font-bold ${
-                  filtroSecretaria === "SEAB"
-                    ? 'bg-green-600 text-white' 
-                    : 'bg-green-100 text-green-800 border border-green-300 hover:bg-green-200'
-                }`}
-              >
-                🌱 SEAB (Agricultura)
-                {filtroSecretaria === "SEAB" && <span className="text-xs">✓</span>}
-              </button>
-              <button 
-                onClick={() => setFiltroSecretaria(filtroSecretaria === "SECID" ? "" : "SECID")}
-                className={`px-4 py-2 rounded-lg shadow transition-colors flex items-center gap-2 text-sm font-bold ${
-                  filtroSecretaria === "SECID"
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200'
-                }`}
-              >
-                🏙️ SECID (Cidades)
-                {filtroSecretaria === "SECID" && <span className="text-xs">✓</span>}
-              </button>
+                label="📊 TODAS"
+                corAtivo="bg-gray-600 text-white"
+                corInativo="bg-gray-100 dark:bg-slate-700 dark:text-slate-100 text-gray-700 border border-gray-300 dark:border-slate-600 hover:bg-gray-200"
+              />
+              <BotaoFiltro
+                ativo={filtroSecretaria === "SEAB"}
+                onClick={() =>
+                  setFiltroSecretaria(filtroSecretaria === "SEAB" ? "" : "SEAB")
+                }
+                label="🌱 SEAB (Agricultura)"
+                corAtivo="bg-green-600 text-white"
+                corInativo="bg-green-100 text-green-800 border border-green-300 hover:bg-green-200"
+              />
+              <BotaoFiltro
+                ativo={filtroSecretaria === "SECID"}
+                onClick={() =>
+                  setFiltroSecretaria(filtroSecretaria === "SECID" ? "" : "SECID")
+                }
+                label="🏙️ SECID (Cidades)"
+                corAtivo="bg-blue-600 text-white"
+                corInativo="bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200"
+              />
             </div>
           </div>
-          
+
+          {/* Campos texto */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                🏛️ Município
-              </label>
-              <input 
-                value={busca} 
-                onChange={(e) => { setBusca(e.target.value); setPage(1); }} 
-                placeholder="Digite o nome do município..." 
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                🛣️ Nome da Estrada
-              </label>
-              <input 
-                value={buscaEstrada} 
-                onChange={(e) => { setBuscaEstrada(e.target.value); setPage(1); }} 
-                placeholder="Digite o nome da estrada..." 
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" 
-              />
-            </div>
+            <CampoTexto
+              label="🏛️ Município"
+              value={busca}
+              onChange={(e) => {
+                setBusca(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Digite o nome do município…"
+            />
+            <CampoTexto
+              label="🛣️ Nome da Estrada"
+              value={buscaEstrada}
+              onChange={(e) => {
+                setBuscaEstrada(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Digite o nome da estrada…"
+            />
           </div>
 
+          {/* Protocolo + controles */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* campo de protocolo robusto */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-slate-200 mb-2">
                 📄 Filtro por Protocolo
               </label>
               <div className="relative">
-                <input 
+                {/* ícone visual, não intercepta clique */}
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 opacity-70 text-gray-500 pointer-events-none select-none z-0">
+                  📄
+                </span>
+                <input
                   type="text"
-                  value={filtroProtocolo} 
+                  value={filtroProtocolo}
                   onChange={handleProtocoloChange}
-                  placeholder="Ex: 241302056 ou 24.130.205-6" 
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 transition-colors ${
-                    protocoloError 
-                      ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
-                      : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                  }`}
-                  maxLength={12} // XX.XXX.XXX-X = 12 caracteres
+                  placeholder="Ex: 241302056 ou 24.130.205-6"
+                  aria-label="Filtro por Protocolo"
+                  className={`w-full h-12 pl-10 pr-10 rounded-lg shadow-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-400
+                    ${
+                      protocoloError
+                        ? "ring-1 ring-red-300 focus:ring-2 focus:ring-red-500"
+                        : "ring-1 ring-gray-300 dark:ring-slate-700 focus:ring-2 focus:ring-blue-500"
+                    }`}
+                  maxLength={12}
+                  {...noTranslateProps}
                 />
                 {extractNumbers(filtroProtocolo).length === 9 && (
-                  <div className="absolute right-2 top-2.5">
-                    <span className="text-green-500 text-sm">✓</span>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10">
+                    <span className="text-green-600 text-sm">✓</span>
                   </div>
                 )}
               </div>
-              
               {protocoloError ? (
                 <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
                   <span>⚠️</span> {protocoloError}
                 </p>
               ) : (
-                <p className="text-xs text-gray-500 mt-1">
-                  💡 Digite apenas números - formatação automática XX.XXX.XXX-X
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  💡 Digite apenas números — formatação automática XX.XXX.XXX-X
                 </p>
               )}
-              
               {filtroProtocolo && extractNumbers(filtroProtocolo).length === 9 && (
                 <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                  <span>✅</span> Protocolo válido - 9 dígitos
+                  <span>✅</span> Protocolo válido — 9 dígitos
                 </p>
               )}
             </div>
-            
-            <div>
-              {/* Espaço reservado para futuros filtros */}
-            </div>
-          </div>
 
-          <div className="mt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex gap-3 items-center">
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                <input 
-                  type="checkbox" 
-                  checked={autoRefresh} 
-                  onChange={(e) => setAutoRefresh(e.target.checked)} 
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+            {/* controles à direita */}
+            <div className="flex flex-col md:flex-row gap-3 items-start md:items-end justify-end">
+              <div className="h-10 px-3 ring-1 ring-gray-300 dark:ring-slate-700 rounded-lg flex items-center gap-2 bg-white dark:bg-slate-900">
+                <input
+                  type="checkbox"
+                  checked={autoRefresh}
+                  onChange={(e) => setAutoRefresh(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-5 h-5"
                 />
-                Auto-refresh
-              </label>
-              <input 
-                type="number" 
-                min={5} 
-                value={refreshIntervalSeconds} 
-                onChange={(e) => setRefreshIntervalSeconds(Number(e.target.value))} 
-                className="p-2 w-20 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-              />
-              <span className="text-sm text-gray-500">segundos</span>
-            </div>
+                <span className="text-sm font-medium text-gray-700 dark:text-slate-200">Auto-refresh</span>
+              </div>
 
-            <button 
-              onClick={clearFilters} 
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors flex items-center gap-2"
-            >
-              🗑️ Limpar Filtros
-            </button>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={5}
+                  value={refreshIntervalSeconds}
+                  onChange={(e) =>
+                    setRefreshIntervalSeconds(Number(e.target.value))
+                  }
+                  className="px-3 h-10 w-24 ring-1 ring-gray-300 dark:ring-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-500 dark:text-slate-300">segundos</span>
+              </div>
+
+              <button
+                onClick={clearFilters}
+                className="px-4 h-10 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-100 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
+              >
+                🗑️ Limpar Filtros
+              </button>
+            </div>
           </div>
         </section>
 
-        {/* Tabela de Dados */}
-        <section className="bg-white rounded-xl shadow-lg overflow-hidden">
-          <div className="px-6 py-4 bg-gray-50 border-b">
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+        {/* Tabela */}
+        <section className="bg-white dark:bg-slate-800 rounded-xl shadow-lg overflow-hidden">
+          <div className="px-6 py-4 bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-700">
+            <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100 flex items-center gap-2">
               📋 Dados das Estradas Rurais
             </h2>
           </div>
 
           {carregando ? (
-            <div className="p-12 text-center">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600 text-lg">Carregando dados...</p>
+            <div className="p-6 space-y-3">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-10 rounded bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-pulse"
+                />
+              ))}
             </div>
           ) : erro ? (
             <div className="p-12 text-center">
               <div className="text-6xl mb-4">⚠️</div>
-              <p className="text-red-600 text-lg font-medium">Erro: {erro}</p>
+              <p className="text-red-600 dark:text-red-300 text-lg font-medium">Erro: {erro}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div
+              ref={tableWrapRef}
+              className="overflow-auto max-h-[70vh]"
+            >
               <table className="w-full table-auto">
                 <colgroup>
-                  <col style={{width: '200px'}} />  {/* Município */}
-                  <col style={{width: '150px'}} />  {/* Protocolo - aumentado para evitar quebra */}
-                  <col style={{width: '140px'}} />  {/* Secretaria */}
-                  <col style={{minWidth: '350px'}} /> {/* Descrição */}
-                  <col style={{width: '140px'}} />  {/* Valor */}
+                  <col style={{ width: "200px" }} />
+                  <col style={{ width: "150px" }} />
+                  <col style={{ width: "140px" }} />
+                  <col style={{ minWidth: "350px" }} />
+                  <col style={{ width: "140px" }} />
                 </colgroup>
-                <thead className="bg-gradient-to-r from-blue-50 to-blue-100 sticky top-0">
+                <thead className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-slate-700 dark:to-slate-700 sticky top-0 transition-shadow">
                   <tr>
-                    <th 
-                      className="px-4 py-3 text-left text-xs font-bold text-gray-700 cursor-pointer hover:bg-blue-200 transition-colors" 
-                      onClick={() => toggleSort("municipio")}
-                    >
-                      <div className="flex items-center gap-1">
-                        🏛️ Município 
-                        {sortBy === "municipio" && (
-                          <span className="text-blue-600">{sortDir === "asc" ? "▲" : "▼"}</span>
-                        )}
-                      </div>
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-700">
+                    <Th onClick={() => toggleSort("municipio")} ativo={sortBy === "municipio"} dir={sortDir}>
+                      🏛️ Município
+                    </Th>
+                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 dark:text-slate-200">
                       📄 Protocolo
                     </th>
-                    <th 
-                      className="px-3 py-3 text-center text-xs font-bold text-gray-700 cursor-pointer hover:bg-blue-200 transition-colors" 
-                      onClick={() => toggleSort("secretaria")}
-                    >
-                      <div className="flex items-center justify-center gap-1">
-                        🏢 Secretaria
-                        {sortBy === "secretaria" && (
-                          <span className="text-blue-600">{sortDir === "asc" ? "▲" : "▼"}</span>
-                        )}
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700">
+                    <Th center onClick={() => toggleSort("secretaria")} ativo={sortBy === "secretaria"} dir={sortDir}>
+                      🏢 Secretaria
+                    </Th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 dark:text-slate-200">
                       📝 Estrada & Descrição
                     </th>
-                    <th 
-                      className="px-4 py-3 text-right text-xs font-bold text-gray-700 cursor-pointer hover:bg-blue-200 transition-colors" 
-                      onClick={() => toggleSort("valor")}
-                    >
-                      <div className="flex items-center justify-end gap-1">
-                        💰 Valor
-                        {sortBy === "valor" && (
-                          <span className="text-blue-600">{sortDir === "asc" ? "▲" : "▼"}</span>
-                        )}
-                      </div>
-                    </th>
+                    <Th right onClick={() => toggleSort("valor")} ativo={sortBy === "valor"} dir={sortDir}>
+                      💰 Valor
+                    </Th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
                   {pageData.map((r, i) => (
-                    <TabelaLinha 
-                      key={`${r.municipio}-${r.protocolo}-${i}`} 
-                      r={r} 
-                      i={i} 
+                    <TabelaLinha
+                      key={`${r.municipio}-${r.protocolo}-${i}`}
+                      r={r}
+                      onCopy={(txt) => {
+                        navigator.clipboard.writeText(txt);
+                        setToast("Protocolo copiado!");
+                      }}
                     />
                   ))}
                 </tbody>
@@ -1078,56 +1061,59 @@ export default function EstradasRurais() {
         </section>
 
         {/* Paginação */}
-        <footer className="mt-6 bg-white rounded-xl shadow-lg p-6">
+        <footer className="mt-6 bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-gray-700">Itens por página:</label>
-              <select 
-                value={pageSize} 
-                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} 
-                className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              <label className="text-sm font-medium text-gray-700 dark:text-slate-200">
+                Itens por página:
+              </label>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="p-2 ring-1 ring-gray-300 dark:ring-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
-                {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+                {[10, 25, 50, 100].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
               </select>
-              <span className="text-sm text-gray-600">
-                Mostrando {((page - 1) * pageSize) + 1} a {Math.min(page * pageSize, total)} de {total} registros
+              <span className="text-sm text-gray-600 dark:text-slate-300">
+                Mostrando {(page - 1) * pageSize + 1} a{" "}
+                {Math.min(page * pageSize, total)} de {total} registros
               </span>
             </div>
 
             <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setPage(1)} 
-                disabled={page === 1} 
-                className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+              <PageBtn disabled={page === 1} onClick={() => setPage(1)}>
+                « Primeiro
+              </PageBtn>
+              <PageBtn
+                disabled={page === 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                &laquo; Primeiro
-              </button>
-              <button 
-                onClick={() => setPage((p) => Math.max(1, p - 1))} 
-                disabled={page === 1} 
-                className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-              >
-                &lsaquo; Anterior
-              </button>
-              
+                ‹ Anterior
+              </PageBtn>
+
               <span className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium">
                 Página {page} de {totalPages}
               </span>
-              
-              <button 
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))} 
-                disabled={page === totalPages} 
-                className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+
+              <PageBtn
+                disabled={page === totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               >
-                Próxima &rsaquo;
-              </button>
-              <button 
-                onClick={() => setPage(totalPages)} 
-                disabled={page === totalPages} 
-                className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+                Próxima ›
+              </PageBtn>
+              <PageBtn
+                disabled={page === totalPages}
+                onClick={() => setPage(totalPages)}
               >
-                Último &raquo;
-              </button>
+                Último »
+              </PageBtn>
             </div>
           </div>
         </footer>
@@ -1136,7 +1122,97 @@ export default function EstradasRurais() {
   );
 }
 
-function formatNumber(n) {
-  if (typeof n !== "number") return "0";
-  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+/* ======================= COMPONENTES AUX ======================= */
+function ResumoCard({ titulo, valor, emoji, cor }) {
+  const border =
+    cor === "green"
+      ? "border-green-500"
+      : cor === "blue"
+      ? "border-blue-500"
+      : cor === "yellow"
+      ? "border-yellow-500"
+      : "border-red-500";
+  const text =
+    cor === "green"
+      ? "text-green-600 dark:text-emerald-300"
+      : cor === "blue"
+      ? "text-blue-600 dark:text-blue-300"
+      : cor === "yellow"
+      ? "text-green-600 dark:text-emerald-300"
+      : "text-red-600 dark:text-red-300";
+  return (
+    <div className={`bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow border-l-4 ${border}`}>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-600 dark:text-slate-300">{titulo}</p>
+          <p className={`text-2xl font-bold ${text}`}>{valor}</p>
+        </div>
+        <div className="text-3xl">{emoji}</div>
+      </div>
+    </div>
+  );
+}
+
+function BotaoFiltro({ ativo, onClick, label, corAtivo, corInativo }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded-lg shadow transition-colors flex items-center gap-2 text-sm font-bold ${
+        ativo ? corAtivo : corInativo
+      }`}
+    >
+      {label} {ativo && <span className="text-xs">✓</span>}
+    </button>
+  );
+}
+
+function CampoTexto({ label, value, onChange, placeholder, type = "text" }) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 dark:text-slate-200 mb-2">
+        {label}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className="w-full p-3 ring-1 ring-gray-300 dark:ring-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 transition-colors"
+      />
+    </div>
+  );
+}
+
+function Th({ children, onClick, ativo, dir, center, right }) {
+  return (
+    <th
+      className={`px-4 py-3 text-xs font-bold text-gray-700 dark:text-slate-200 cursor-pointer hover:bg-blue-200 dark:hover:bg-slate-700 transition-colors ${
+        center ? "text-center" : right ? "text-right" : "text-left"
+      }`}
+      onClick={onClick}
+    >
+      <div
+        className={`flex items-center gap-1 ${
+          center ? "justify-center" : right ? "justify-end" : ""
+        }`}
+      >
+        {children}{" "}
+        {ativo && (
+          <span className="text-blue-600 dark:text-blue-300">{dir === "asc" ? "▲" : "▼"}</span>
+        )}
+      </div>
+    </th>
+  );
+}
+
+function PageBtn({ children, disabled, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="px-3 py-2 ring-1 ring-gray-300 dark:ring-slate-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+    >
+      {children}
+    </button>
+  );
 }
