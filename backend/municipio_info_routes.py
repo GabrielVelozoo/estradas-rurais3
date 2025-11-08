@@ -21,6 +21,11 @@ from pedidos_csv_service import get_pedidos_service
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+@router.get("/test-municipio")
+async def test_municipio():
+    """Test route to verify router is working"""
+    return {"message": "Municipio info router is working"}
+
 # MongoDB connection - use same database as main server
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME = os.getenv("DB_NAME", "test_database")
