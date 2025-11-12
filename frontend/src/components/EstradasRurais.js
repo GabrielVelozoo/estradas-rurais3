@@ -671,6 +671,7 @@ export default function EstradasRurais() {
     buscaDescricao,
     filtroProtocolo,
     apenasPrioridades,
+    apenasAprovados,
     filtroSecretaria,
     sortBy,
     sortDir,
