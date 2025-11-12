@@ -871,6 +871,16 @@ export default function EstradasRurais() {
                 {apenasPrioridades ? "Mostrando Prioridades" : "Ver Prioridades"}
               </button>
               <button
+                onClick={() => setApenasAprovados(!apenasAprovados)}
+                className={`px-4 py-2 rounded-lg shadow-lg transition-colors ${
+                  apenasAprovados
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                {apenasAprovados ? "Mostrando Aprovados" : "Só Aprovados"}
+              </button>
+              <button
                 onClick={imprimir}
                 className="px-4 py-2 rounded-lg bg-purple-600 text-white shadow-lg hover:bg-purple-700 transition-colors"
               >
