@@ -638,6 +638,7 @@ export default function EstradasRurais() {
       if (ldDesc && !norm(d.estado || "").includes(ldDesc)) return false;
 
       if (apenasPrioridades && !d.isPrioridade) return false;
+      if (apenasAprovados && !d.isAprovado) return false;
       if (filtroSecretaria && d.secretaria !== filtroSecretaria) return false;
 
       if (numFiltro) {
