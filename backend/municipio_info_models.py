@@ -4,7 +4,8 @@ from typing import Optional
 from datetime import datetime, timezone
 import uuid
 
-# MunicipioInfo Models (1-1 with Municipios)
+# ========= MunicipioInfo (1-1 com Municipios) =========
+
 class MunicipioInfoBase(BaseModel):
     municipio_id: int
     prefeito_nome: Optional[str] = None
@@ -18,9 +19,11 @@ class MunicipioInfoBase(BaseModel):
     votos_2022: Optional[int] = None
 
 class MunicipioInfoCreate(MunicipioInfoBase):
+    """Payload usado para criar/atualizar (upsert)."""
     pass
 
 class MunicipioInfoUpdate(BaseModel):
+    """Payload parcial para update (PUT)."""
     prefeito_nome: Optional[str] = None
     prefeito_partido: Optional[str] = None
     prefeito_tel: Optional[str] = None
@@ -37,6 +40,7 @@ class MunicipioInfo(MunicipioInfoBase):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Config:
+        # Pydantic consegue parsear ISO8601 -> datetime automaticamente
         json_schema_extra = {
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -55,7 +59,8 @@ class MunicipioInfo(MunicipioInfoBase):
             }
         }
 
-# MunicipioLiderancas Models (1-N)
+# ========= MunicipioLiderancas (1-N) =========
+
 class MunicipioLiderancaBase(BaseModel):
     municipio_id: int
     nome: str

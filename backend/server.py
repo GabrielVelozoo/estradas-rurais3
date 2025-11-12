@@ -105,7 +105,7 @@ async def get_status_checks():
 
 
 # -------------------------------------------------
-# Estradas Rurais - busca Google Sheets A:H (inclui "Última Edição" na coluna H)
+# Estradas Rurais - Google Sheets A:I (inclui "APROVADO" na coluna I)
 # -------------------------------------------------
 @api_router.get("/estradas-rurais")
 async def get_estradas_rurais(current_user: User = Depends(get_current_active_user)):
@@ -117,14 +117,15 @@ async def get_estradas_rurais(current_user: User = Depends(get_current_active_us
       "values": [ ... ]
     }
 
-    • Busca o range A:H (cabeçalho + dados).
+    • Busca o range A:I (cabeçalho + dados).
     • valueRenderOption=FORMATTED_VALUE + dateTimeRenderOption=FORMATTED_STRING
       => datas já vêm em "dd/MM/yyyy HH:mm:ss" quando possível.
+    • Coluna I deve conter "APROVADO" para o frontend aplicar o selo/estilo azul.
     """
     import aiohttp
     from urllib.parse import quote
 
-    # Tenta pegar do .env; se não houver, cai no fallback (os mesmos que você usava)
+    # Tenta pegar do .env; se não houver, usa fallback
     SHEET_ID = (
         os.environ.get("SHEET_ID", "").strip()
         or "1jaHnRgqRyMLjZVvaRSkG2kOyZ4kMEBgsPhwYIGVj490"
@@ -134,13 +135,14 @@ async def get_estradas_rurais(current_user: User = Depends(get_current_active_us
         or "AIzaSyBdd6E9Dz5W68XdhLCsLIlErt1ylwTt5Jk"
     )
 
-    # Nome da aba (opcional). Se não setar, usamos A1:H direto.
+    # Nome da aba (opcional). Se não setar, usamos A1:I direto.
     SHEET_TAB = os.environ.get("SHEET_TAB", "").strip()
-    # IMPORTANTE: se quiser vir SEM cabeçalho, mude para "A3:H"
-    RANGE_AH = "A1:H"
+
+    # 🔵 IMPORTANTE: agora inclui a Coluna I (APROVADO)
+    RANGE_AI = "A1:I"
 
     # Monta o range final (com ou sem nome de aba)
-    the_range = f"{SHEET_TAB}!{RANGE_AH}" if SHEET_TAB else RANGE_AH
+    the_range = f"{SHEET_TAB}!{RANGE_AI}" if SHEET_TAB else RANGE_AI
 
     # Monta URL da API
     base = f"https://sheets.googleapis.com/v4/spreadsheets/{SHEET_ID}/values/{quote(the_range)}"

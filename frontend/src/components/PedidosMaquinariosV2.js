@@ -1,973 +1,1122 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import * as XLSX from 'xlsx';
-import PrintHeader from './PrintHeader';
-import MunicipioSelect from './MunicipioSelect';
-import { useDataCache } from '../contexts/DataCacheContext';
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import * as XLSX from "xlsx";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
-// Status disponíveis
-const STATUS_OPTIONS = [
-  { value: 'em_andamento', label: 'Em andamento' },
-  { value: 'aguardando_atendimento', label: 'Aguardando atendimento' },
-  { value: 'arquivado', label: 'Arquivado' },
-  { value: 'atendido', label: 'Atendido' },
+// Catálogo local padrão (bancada)
+const CATALOGO_LOCAL = [
+  { nome: "Trator de Esteiras", preco: 1222500.0 },
+  { nome: "Motoniveladora", preco: 1217352.22 },
+  { nome: "Caminhão Caçamba 6x4", preco: 905300.0 },
+  { nome: "Caminhão Prancha", preco: 900000.0 },
+  { nome: "Escavadeira", preco: 830665.0 },
+  { nome: "Pá Carregadeira", preco: 778250.0 },
+  { nome: "Rolo compactador", preco: 716180.91 },
+  { nome: "Retroescavadeira", preco: 484111.11 },
+  { nome: "Bob Cat", preco: 430000.0 },
+  { nome: "Trator 100–110CV", preco: 410000.0 },
 ];
 
-export default function PedidosMaquinariosV2() {
-  // Hook de cache
-  const { fetchWithCache, clearCache } = useDataCache();
-  
-  // Estados principais
-  const [pedidos, setPedidos] = useState([]);
-  const [catalogoEquipamentos, setCatalogoEquipamentos] = useState([]);
-  const [catalogoMap, setCatalogoMap] = useState({});
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState(null);
-  
-  // Estados de filtros
-  const [buscaGeral, setBuscaGeral] = useState('');
-  const [filtroMunicipio, setFiltroMunicipio] = useState('');
-  const [filtroStatus, setFiltroStatus] = useState('');
-  
-  // Estados do modal
-  const [showModal, setShowModal] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  
-  // Estados do formulário
-  const [formData, setFormData] = useState({
-    municipio_id: '',
-    municipio_nome: '',
-    lideranca_nome: '',
-    itens: [],
-    valor_total: 0,
-    status: ''
-  });
+const fmtBRL = (v = 0) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+    Number(v || 0)
+  );
 
-  // Normalizar texto (remover acentos)
-  const normalizeText = (text) => {
-    if (!text) return '';
-    return text
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .trim();
-  };
+// converte qualquer string digitada (com ou sem R$, pontos/virgulas) em número (centavos) BR
+const toNumberBRL = (input) => {
+  if (typeof input === "number") return input;
+  const digits = String(input || "").replace(/\D/g, "");
+  return digits ? Number(digits) / 100 : 0;
+};
 
-  // Carregar catálogo de equipamentos com cache
-  const fetchCatalogo = useCallback(async () => {
-    try {
-      const data = await fetchWithCache(
-        'maquinarios-catalogo',
-        async (signal) => {
-          const response = await fetch(`${BACKEND_URL}/api/pedidos-maquinarios/catalogo`, {
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            signal
-          });
+const KEY = "maquinarios-municipios-v4";
 
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
+// -------- utils de normalização --------
+const norm = (s) =>
+  (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .trim();
 
-          return await response.json();
-        },
-        { ttl: 10 * 60 * 1000 } // Cache por 10 minutos (catálogo muda raramente)
-      );
+/* ======================= AUTOCOMPLETE DE MUNICÍPIO ======================= */
+function AutocompleteMunicipio({
+  value,
+  onChange,
+  onBlurCanonicalize,
+  options = [], // [{id, nome}]
+  placeholder = "Ex.: Cascavel",
+  label = "Nome do município",
+  helper = "Digite para filtrar e selecione o nome oficial (IBGE).",
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value || "");
+  const [highlight, setHighlight] = useState(0);
+  const wrapRef = useRef(null);
+  const listRef = useRef(null);
 
-      if (data.equipamentos && Array.isArray(data.equipamentos)) {
-        setCatalogoEquipamentos(data.equipamentos);
-        
-        // Criar mapa nome -> preço para lookup rápido
-        const map = {};
-        data.equipamentos.forEach(eq => {
-          map[eq.nome] = eq.preco;
-        });
-        setCatalogoMap(map);
-      }
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        console.error('Erro ao carregar catálogo:', error);
-      }
-    }
-  }, [fetchWithCache]);
+  // fecha ao clicar fora
+  useEffect(() => {
+    const handler = (e) => {
+      if (!wrapRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
-  // Carregar pedidos com cache
-  const fetchPedidos = useCallback(async (forceFresh = false) => {
-    setCarregando(true);
-    setErro(null);
-    
-    try {
-      const data = await fetchWithCache(
-        'maquinarios-pedidos',
-        async (signal) => {
-          const response = await fetch(`${BACKEND_URL}/api/pedidos-maquinarios`, {
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            signal
-          });
+  useEffect(() => setQuery(value || ""), [value]);
 
-          if (response.status === 401) {
-            throw new Error('AUTH_ERROR');
-          }
-
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
-
-          const json = await response.json();
-          
-          if (!Array.isArray(json)) {
-            throw new Error('Invalid data format');
-          }
-
-          return json;
-        },
-        { forceFresh }
-      );
-
-      setPedidos(data);
-      setCarregando(false);
-    } catch (error) {
-      if (error.message === 'AUTH_ERROR') {
-        setErro('Sessão expirada. Por favor, faça login novamente.');
-        setTimeout(() => window.location.href = '/', 2000);
-        return;
-      }
-
-      if (error.name === 'AbortError') {
-        console.log('[Maquinários] Requisição cancelada');
-        return;
-      }
-      
-      console.error('[Maquinários] Erro ao carregar:', error);
-      setErro('Erro ao carregar pedidos. Tente novamente.');
-      setCarregando(false);
-    }
-  }, [fetchWithCache]);
+  const filtered = useMemo(() => {
+    const q = norm(query);
+    if (!q) return options.slice(0, 50);
+    return options.filter((o) => norm(o.nome).includes(q)).slice(0, 50);
+  }, [options, query]);
 
   useEffect(() => {
-    fetchCatalogo();
-    fetchPedidos();
-  }, [fetchCatalogo, fetchPedidos]);
+    if (!open) return;
+    setHighlight(0);
+  }, [open, query]);
 
-  // Calcular cards do dashboard
-  const dashboardStats = useMemo(() => {
-    if (!Array.isArray(pedidos) || pedidos.length === 0) {
-      return {
-        municipiosDistintos: 0,
-        totalPedidos: 0,
-        totalEquipamentos: 0,
-        valorTotal: 0
-      };
+  useEffect(() => {
+    if (!open) return;
+    const el = listRef.current?.querySelector(`[data-idx="${highlight}"]`);
+    el?.scrollIntoView?.({ block: "nearest" });
+  }, [highlight, open]);
+
+  const selectValue = (nome) => {
+    onChange?.(nome);
+    setQuery(nome);
+    setOpen(false);
+    onBlurCanonicalize?.(nome);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!open && (e.key === "ArrowDown" || e.key === "Enter")) {
+      setOpen(true);
+      return;
     }
+    if (!open) return;
 
-    const municipiosSet = new Set();
-    let totalEquipamentos = 0;
-    let valorTotal = 0;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlight((h) => Math.min(h + 1, filtered.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => Math.max(h - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (filtered[highlight]) selectValue(filtered[highlight].nome);
+      else if (query) selectValue(query);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+    }
+  };
 
-    pedidos.forEach(pedido => {
-      if (pedido.municipio_nome) {
-        municipiosSet.add(pedido.municipio_nome);
-      }
-      
-      if (Array.isArray(pedido.itens)) {
-        pedido.itens.forEach(item => {
-          totalEquipamentos += item.quantidade || 0;
-        });
-      }
-      
-      valorTotal += pedido.valor_total || 0;
-    });
+  const renderWithMark = (nome) => {
+    const q = norm(query);
+    if (!q) return nome;
+    const ni = norm(nome);
+    const idx = ni.indexOf(q);
+    if (idx === -1) return nome;
+    const start = nome.slice(0, idx);
+    const mid = nome.slice(idx, idx + query.length);
+    const end = nome.slice(idx + query.length);
+    return (
+      <>
+        {start}
+        <mark className="bg-yellow-200 rounded px-0.5">{mid}</mark>
+        {end}
+      </>
+    );
+  };
 
-    return {
-      municipiosDistintos: municipiosSet.size,
-      totalPedidos: pedidos.length,
-      totalEquipamentos,
-      valorTotal
-    };
-  }, [pedidos]);
+  return (
+    <div ref={wrapRef} className="relative">
+      <label className="block text-sm text-gray-700 mb-1">{label}</label>
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <input
+            className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            value={query}
+            placeholder={placeholder}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              onChange?.(e.target.value);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={handleKeyDown}
+          />
+          {!!value && value === query && (
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+              IBGE
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50"
+          title="Mostrar lista"
+        >
+          ▼
+        </button>
+      </div>
 
-  // Filtrar pedidos
-  const pedidosFiltrados = useMemo(() => {
+      <p className="text-xs text-gray-500 mt-1">{helper}</p>
+
+      {open && (
+        <div
+          ref={listRef}
+          className="absolute z-50 mt-2 w-full max-h-72 overflow-auto bg-white border rounded-xl shadow-xl"
+        >
+          {filtered.length === 0 ? (
+            <div className="p-3 text-sm text-gray-500">Nenhum resultado.</div>
+          ) : (
+            filtered.map((o, idx) => (
+              <button
+                key={o.id}
+                type="button"
+                data-idx={idx}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => selectValue(o.nome)}
+                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between ${
+                  idx === highlight ? "bg-green-50" : "hover:bg-gray-50"
+                }`}
+                onMouseEnter={() => setHighlight(idx)}
+              >
+                <span className="truncate">{renderWithMark(o.nome)}</span>
+                <span className="text-[10px] uppercase tracking-wider text-gray-400 ml-3">
+                  Oficial IBGE
+                </span>
+              </button>
+            ))
+          )}
+          <div className="border-t my-1"></div>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => selectValue(query || "")}
+            className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-gray-50"
+          >
+            Usar exatamente: <span className="font-medium">“{query || "—"}”</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ======================= PÁGINA ======================= */
+export default function PedidosMaquinariosV2() {
+  const [catalogo, setCatalogo] = useState(CATALOGO_LOCAL);
+  const [lista, setLista] = useState([]);
+  const [busca, setBusca] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [detalheId, setDetalheId] = useState(null);
+  const [salvando, setSalvando] = useState(false);
+
+  // --- municípios do PR (IBGE) para autocomplete ---
+  const [municipiosPR, setMunicipiosPR] = useState([]); // [{id, nome}]
+  const [mapCanonico, setMapCanonico] = useState({}); // norm(nome)->NomeCanônico
+
+  const blankForm = {
+    nome: "",
+    obs: "",
+    m37: {
+      protocolo: "",
+      valor_global: 0,
+      valor_seab: 0,
+      contrapartida: 0,
+      itensManuais: [],
+    },
+    bancada: {
+      protocolo: "",
+      itensCatalogo: [],
+    },
+  };
+  const [form, setForm] = useState(blankForm);
+
+  // catálogo (bancada) do backend, se existir
+  const loadCatalogo = async () => {
     try {
-      if (!Array.isArray(pedidos)) return [];
-
-      return pedidos.filter(pedido => {
-        if (!pedido || typeof pedido !== 'object') return false;
-
-        // Busca geral
-        if (buscaGeral) {
-          const buscaNorm = normalizeText(buscaGeral);
-          const matchMunicipio = normalizeText(pedido.municipio_nome || '').includes(buscaNorm);
-          const matchLideranca = normalizeText(pedido.lideranca_nome || '').includes(buscaNorm);
-          
-          // Buscar em equipamentos
-          let matchEquipamento = false;
-          if (Array.isArray(pedido.itens)) {
-            matchEquipamento = pedido.itens.some(item => 
-              normalizeText(item.equipamento || '').includes(buscaNorm)
-            );
-          }
-          
-          if (!matchMunicipio && !matchLideranca && !matchEquipamento) return false;
-        }
-
-        // Filtro por município
-        if (filtroMunicipio) {
-          const match = normalizeText(pedido.municipio_nome || '').includes(normalizeText(filtroMunicipio));
-          if (!match) return false;
-        }
-
-        // Filtro por status
-        if (filtroStatus) {
-          if (pedido.status !== filtroStatus) return false;
-        }
-
-        return true;
-      });
-    } catch (error) {
-      console.error('Erro ao filtrar pedidos:', error);
-      return [];
+      if (!BACKEND_URL) throw new Error("no-backend");
+      const r = await fetch(
+        `${BACKEND_URL}/api/pedidos-maquinarios/catalogo`,
+        { credentials: "include" }
+      );
+      if (!r.ok) throw new Error("backend-error");
+      const data = await r.json();
+      if (Array.isArray(data?.equipamentos)) {
+        setCatalogo(
+          data.equipamentos.map((e) => ({ nome: e.nome, preco: e.preco }))
+        );
+      } else {
+        setCatalogo(CATALOGO_LOCAL);
+      }
+    } catch {
+      setCatalogo(CATALOGO_LOCAL);
     }
-  }, [pedidos, buscaGeral, filtroMunicipio, filtroStatus]);
+  };
 
-  // Abrir modal
-  const openModal = (pedido = null) => {
-    if (pedido) {
-      setEditingId(pedido.id);
-      setFormData({
-        municipio_id: pedido.municipio_id || '',
-        municipio_nome: pedido.municipio_nome || '',
-        lideranca_nome: pedido.lideranca_nome || '',
-        itens: pedido.itens || [],
-        valor_total: pedido.valor_total || 0,
-        status: pedido.status || ''
+  // persistência municípios
+  const load = async () => {
+    try {
+      if (!BACKEND_URL) throw new Error("no-backend");
+      const r = await fetch(`${BACKEND_URL}/api/maquinarios/municipios`, {
+        credentials: "include",
       });
-    } else {
-      setEditingId(null);
-      setFormData({
-        municipio_id: '',
-        municipio_nome: '',
-        lideranca_nome: '',
-        itens: [],
-        valor_total: 0,
-        status: ''
-      });
+      if (!r.ok) throw new Error("backend-error");
+      const data = await r.json();
+      setLista(Array.isArray(data) ? data : []);
+      localStorage.setItem(KEY, JSON.stringify(data));
+    } catch {
+      const raw = localStorage.getItem(KEY);
+      setLista(raw ? JSON.parse(raw) : []);
     }
+  };
+  const saveAll = async (data) => {
+    setLista(data);
+    localStorage.setItem(KEY, JSON.stringify(data));
+    try {
+      if (!BACKEND_URL) throw new Error("no-backend");
+      await fetch(`${BACKEND_URL}/api/maquinarios/municipios`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+    } catch {}
+  };
+
+  // -------- carregar municípios PR (IBGE) --------
+  const loadMunicipiosPR = async () => {
+    try {
+      const r = await fetch(
+        "https://servicodados.ibge.gov.br/api/v1/localidades/estados/41/municipios"
+      );
+      if (!r.ok) throw new Error("ibge-error");
+      const data = await r.json();
+      const ordenados = (data || [])
+        .map((m) => ({ id: m.id, nome: m.nome }))
+        .sort((a, b) => norm(a.nome).localeCompare(norm(b.nome)));
+      setMunicipiosPR(ordenados);
+      const map = {};
+      ordenados.forEach((m) => (map[norm(m.nome)] = m.nome));
+      setMapCanonico(map);
+    } catch {
+      setMunicipiosPR([]);
+      setMapCanonico({});
+    }
+  };
+
+  useEffect(() => {
+    loadCatalogo();
+    load();
+    loadMunicipiosPR();
+  }, []);
+
+  const total = (arr) =>
+    (arr || []).reduce((sum, i) => sum + Number(i.subtotal || 0), 0);
+
+  const listaFiltrada = useMemo(() => {
+    const q = norm(busca);
+    return [...lista]
+      .sort((a, b) => norm(a.nome).localeCompare(norm(b.nome)))
+      .filter(
+        (m) =>
+          !q ||
+          norm(m.nome).includes(q) ||
+          norm(m?.obs).includes(q) ||
+          norm(m?.m37?.protocolo).includes(q) ||
+          norm(m?.bancada?.protocolo).includes(q)
+      );
+  }, [lista, busca]);
+
+  // modal
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(blankForm);
+    setShowModal(true);
+  };
+  const openEdit = (m) => {
+    setEditingId(m.id);
+    setForm({
+      nome: m.nome || "",
+      obs: m.obs || "",
+      m37: {
+        protocolo: m?.m37?.protocolo || "",
+        valor_global: Number(m?.m37?.valor_global || 0),
+        valor_seab: Number(m?.m37?.valor_seab || 0),
+        contrapartida: Number(m?.m37?.contrapartida || 0),
+        itensManuais: m?.m37?.itensManuais || [],
+      },
+      bancada: {
+        protocolo: m?.bancada?.protocolo || "",
+        itensCatalogo: m?.bancada?.itensCatalogo || [],
+      },
+    });
     setShowModal(true);
   };
 
-  // Fechar modal
-  const closeModal = () => {
-    setShowModal(false);
-    setEditingId(null);
+  // Garantir nome canônico do IBGE
+  const canonicalizeNome = (nomeDigitado) => {
+    const n = norm(nomeDigitado);
+    if (!n) return "";
+    if (mapCanonico[n]) return mapCanonico[n];
+    const candidato = municipiosPR.find((m) => norm(m.nome).startsWith(n));
+    if (candidato) return candidato.nome;
+    return nomeDigitado;
   };
 
-  // Adicionar item
-  const handleAddItem = () => {
-    const novoItem = {
-      equipamento: '',
-      preco_unitario: 0,
-      quantidade: 1,
-      observacao: '',
-      subtotal: 0
-    };
-    
-    setFormData({
-      ...formData,
-      itens: [...formData.itens, novoItem]
-    });
-  };
-
-  // Remover item
-  const handleRemoveItem = (index) => {
-    const novosItens = formData.itens.filter((_, i) => i !== index);
-    const novoTotal = novosItens.reduce((sum, item) => sum + (item.subtotal || 0), 0);
-    
-    setFormData({
-      ...formData,
-      itens: novosItens,
-      valor_total: novoTotal
-    });
-  };
-
-  // Atualizar item
-  const handleUpdateItem = (index, field, value) => {
-    const novosItens = [...formData.itens];
-    novosItens[index] = { ...novosItens[index], [field]: value };
-
-    // Se mudou o equipamento, atualizar preço unitário
-    if (field === 'equipamento' && value) {
-      const preco = catalogoMap[value] || 0;
-      novosItens[index].preco_unitario = preco;
-      novosItens[index].subtotal = preco * (novosItens[index].quantidade || 1);
-    }
-
-    // Se mudou a quantidade, recalcular subtotal
-    if (field === 'quantidade') {
-      const qtd = parseInt(value) || 1;
-      novosItens[index].quantidade = qtd;
-      novosItens[index].subtotal = (novosItens[index].preco_unitario || 0) * qtd;
-    }
-
-    // Recalcular total geral
-    const novoTotal = novosItens.reduce((sum, item) => sum + (item.subtotal || 0), 0);
-
-    setFormData({
-      ...formData,
-      itens: novosItens,
-      valor_total: novoTotal
-    });
-  };
-
-  // Submeter formulário
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Validações
-    if (!formData.municipio_id) {
-      alert('Município é obrigatório!');
-      return;
-    }
-
-    if (formData.itens.length === 0) {
-      alert('Adicione pelo menos um item ao pedido!');
-      return;
-    }
-
-    // Validar que todos os itens têm equipamento e quantidade
-    const itemInvalido = formData.itens.find(item => !item.equipamento || !item.quantidade || item.quantidade < 1);
-    if (itemInvalido) {
-      alert('Todos os itens devem ter equipamento e quantidade (mínimo 1)!');
-      return;
-    }
-
-    setSubmitting(true);
+  const handleSave = async (e) => {
+    e?.preventDefault?.();
+    setSalvando(true);
     try {
-      const url = editingId 
-        ? `${BACKEND_URL}/api/pedidos-maquinarios/${editingId}`
-        : `${BACKEND_URL}/api/pedidos-maquinarios`;
-      
-      const method = editingId ? 'PUT' : 'POST';
-
-      // ✅ Garantir que todos os campos são do tipo correto
-      const payload = {
-        municipio_id: String(formData.municipio_id),
-        municipio_nome: formData.municipio_nome,
-        lideranca_nome: formData.lideranca_nome || '',
-        status: formData.status || null,
-        itens: formData.itens.map(item => ({
-          equipamento: item.equipamento,
-          preco_unitario: Number(item.preco_unitario),
-          quantidade: Number(item.quantidade),
-          observacao: item.observacao || '',
-          subtotal: Number(item.subtotal)
-        })),
-        valor_total: Number(formData.valor_total)
-      };
-
-      const response = await fetch(url, {
-        method,
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        let errorMessage = 'Erro ao salvar pedido';
-        try {
-          const errorData = await response.json();
-          console.error('Erro do backend:', errorData);
-          
-          // Tentar extrair mensagem de erro de diferentes formatos
-          if (typeof errorData.detail === 'string') {
-            errorMessage = errorData.detail;
-          } else if (errorData.detail?.error) {
-            errorMessage = errorData.detail.error;
-          } else if (errorData.detail && typeof errorData.detail === 'object') {
-            errorMessage = JSON.stringify(errorData.detail);
-          } else if (errorData.message) {
-            errorMessage = errorData.message;
-          }
-        } catch (e) {
-          errorMessage = `Erro ${response.status}: ${response.statusText}`;
-        }
-        throw new Error(errorMessage);
-      }
-
-      // ✅ Invalidar cache e forçar refresh da lista
-      clearCache('maquinarios-pedidos');
-      await fetchPedidos(true); // Force fresh data
-      closeModal();
-      alert(editingId ? 'Pedido atualizado com sucesso!' : 'Pedido criado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao salvar:', error);
-      alert(error.message || 'Erro desconhecido ao salvar pedido');
+      const payload = { id: editingId || Date.now(), ...form, nome: canonicalizeNome(form.nome) };
+      const novo = editingId
+        ? lista.map((m) => (m.id === editingId ? payload : m))
+        : [...lista, payload];
+      await saveAll(novo);
+      setShowModal(false);
+      setEditingId(null);
+      setForm(blankForm);
     } finally {
-      setSubmitting(false);
+      setSalvando(false);
     }
   };
-
-  // Deletar pedido
   const handleDelete = async (id) => {
-    if (!window.confirm('Tem certeza que deseja excluir este pedido?')) return;
+    if (!window.confirm("Excluir este município?")) return;
+    await saveAll(lista.filter((m) => m.id !== id));
+  };
 
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/pedidos-maquinarios/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
+  // helpers p/ inputs de moeda (m37)
+  const setM37Money = (field) => (e) => {
+    const n = toNumberBRL(e.target.value);
+    setForm((p) => ({ ...p, m37: { ...p.m37, [field]: n } }));
+  };
 
-      if (!response.ok) {
-        throw new Error('Erro ao excluir');
+  // itens 3.7mi (manuais)
+  const addItemM37 = () =>
+    setForm((p) => ({
+      ...p,
+      m37: {
+        ...p.m37,
+        itensManuais: [
+          ...(p.m37.itensManuais || []),
+          {
+            descricao: "",
+            preco_unitario: 0,
+            quantidade: 1,
+            subtotal: 0,
+            observacao: "",
+          },
+        ],
+      },
+    }));
+  const rmItemM37 = (idx) =>
+    setForm((p) => ({
+      ...p,
+      m37: {
+        ...p.m37,
+        itensManuais: (p.m37.itensManuais || []).filter((_, i) => i !== idx),
+      },
+    }));
+  const updItemM37 = (idx, field, value) =>
+    setForm((p) => {
+      const itens = [...(p.m37.itensManuais || [])];
+      const row = { ...itens[idx], [field]: value };
+      if (field === "quantidade") row.quantidade = Math.max(1, Number(value || 1));
+      if (field === "preco_unitario") row.preco_unitario = Number(value || 0);
+      row.subtotal = Number(row.preco_unitario || 0) * Number(row.quantidade || 1);
+      itens[idx] = row;
+      return { ...p, m37: { ...p.m37, itensManuais: itens } };
+    });
+
+  // itens bancada (catálogo)
+  const addItemBancada = () =>
+    setForm((p) => ({
+      ...p,
+      bancada: {
+        ...p.bancada,
+        itensCatalogo: [
+          ...(p.bancada.itensCatalogo || []),
+          {
+            equipamento: "",
+            preco_unitario: 0,
+            quantidade: 1,
+            subtotal: 0,
+            observacao: "",
+          },
+        ],
+      },
+    }));
+  const rmItemBancada = (idx) =>
+    setForm((p) => ({
+      ...p,
+      bancada: {
+        ...p.bancada,
+        itensCatalogo: (p.bancada.itensCatalogo || []).filter((_, i) => i !== idx),
+      },
+    }));
+  const updItemBancada = (idx, field, value) =>
+    setForm((p) => {
+      const itens = [...(p.bancada.itensCatalogo || [])];
+      const row = { ...itens[idx], [field]: value };
+      if (field === "equipamento") {
+        const preco = catalogo.find((c) => c.nome === value)?.preco || 0;
+        row.preco_unitario = preco;
+        row.subtotal = preco * Number(row.quantidade || 1);
       }
+      if (field === "quantidade") {
+        const qtd = Math.max(1, Number(value || 1));
+        row.quantidade = qtd;
+        row.subtotal = Number(row.preco_unitario || 0) * qtd;
+      }
+      itens[idx] = row;
+      return { ...p, bancada: { ...p.bancada, itensCatalogo: itens } };
+    });
 
-      // ✅ Invalidar cache e forçar refresh da lista
-      clearCache('maquinarios-pedidos');
-      await fetchPedidos(true); // Force fresh data
-      alert('Pedido excluído com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir:', error);
-      alert(error.message);
-    }
-  };
-
-  // Exportar para Excel DETALHADO (cada item vira linha)
-  const handleExportExcel = () => {
-    try {
-      const dadosExport = [];
-      
-      pedidosFiltrados.forEach(pedido => {
-        if (Array.isArray(pedido.itens)) {
-          pedido.itens.forEach(item => {
-            dadosExport.push({
-              'ID Pedido': pedido.id,
-              'Município': pedido.municipio_nome || '-',
-              'Liderança': pedido.lideranca_nome || '-',
-              'Equipamento': item.equipamento || '-',
-              'Preço Unitário': item.preco_unitario || 0,
-              'Quantidade': item.quantidade || 0,
-              'Subtotal': item.subtotal || 0,
-              'Observação': item.observacao || '-',
-              'Status': pedido.status ? STATUS_OPTIONS.find(s => s.value === pedido.status)?.label : '-',
-              'Criado em': new Date(pedido.created_at).toLocaleString('pt-BR')
-            });
-          });
-        }
-      });
-
-      const ws = XLSX.utils.json_to_sheet(dadosExport);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Pedidos Maquinários');
-      XLSX.writeFile(wb, `pedidos_maquinarios_${new Date().toISOString().split('T')[0]}.xlsx`);
-    } catch (error) {
-      console.error('Erro ao exportar:', error);
-      alert('Erro ao exportar para Excel');
-    }
-  };
-
-  // Formatar status
-  const formatStatus = (status) => {
-    if (!status) return '-';
-    const opt = STATUS_OPTIONS.find(s => s.value === status);
-    return opt ? opt.label : status;
-  };
-
-  // Formatar moeda
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value || 0);
-  };
-
-  // Loading
-  if (carregando) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="h-12 bg-gray-200 rounded w-1/3 mb-8 animate-pulse"></div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded animate-pulse"></div>
-            ))}
-          </div>
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-20 bg-gray-100 rounded animate-pulse"></div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+  // export
+  const exportExcel = () => {
+    const rows = [];
+    listaFiltrada.forEach((m) => {
+      (m?.m37?.itensManuais || []).forEach((i) =>
+        rows.push({
+          Programa: "Maquinários de 3.7mi",
+          Município: m.nome,
+          Protocolo: m?.m37?.protocolo || "-",
+          "Valor Global": m?.m37?.valor_global || 0,
+          "Valor SEAB": m?.m37?.valor_seab || 0,
+          Contrapartida: m?.m37?.contrapartida || 0,
+          Item: i.descricao || "-",
+          "Preço Unitário": i.preco_unitario || 0,
+          Quantidade: i.quantidade || 0,
+          Subtotal: i.subtotal || 0,
+          Observação: i.observacao || "-",
+        })
+      );
+      (m?.bancada?.itensCatalogo || []).forEach((i) =>
+        rows.push({
+          Programa: "Emenda de Bancada",
+          Município: m.nome,
+          Protocolo: m?.bancada?.protocolo || "-",
+          Item: i.equipamento || "-",
+          "Preço Unitário": i.preco_unitario || 0,
+          Quantidade: i.quantidade || 0,
+          Subtotal: i.subtotal || 0,
+          Observação: i.observacao || "-",
+        })
+      );
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Municípios");
+    XLSX.writeFile(
+      wb,
+      `maquinarios_municipios_${new Date().toISOString().slice(0, 10)}.xlsx`
     );
-  }
+  };
 
+  // UI
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 p-8 print-container">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Print Header */}
-        <PrintHeader 
-          titulo="Pedidos de Maquinários"
-          resumoFiltros={{
-            'Busca': buscaGeral || 'Todos',
-            'Município': filtroMunicipio || 'Todos',
-            'Status': filtroStatus ? formatStatus(filtroStatus) : 'Todos',
-            'Total de pedidos': pedidosFiltrados.length
-          }}
-        />
-
-        {/* Header */}
-        <div className="mb-8 no-print">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-            🚜 Pedidos de Maquinários
+        <div className="mb-6">
+          <h1 className="text-4xl font-bold flex items-center gap-3">
+            🚜 Municípios — 3.7mi & Emenda de Bancada
           </h1>
-          <p className="text-gray-600">Gerencie os pedidos de equipamentos por município</p>
+          <p className="text-gray-600">Tudo opcional; bancada com catálogo fixo.</p>
         </div>
 
-        {/* Dashboard Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          {/* Card 1: Municípios */}
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-sm font-medium mb-1">Municípios</p>
-                <p className="text-3xl font-bold">{dashboardStats.municipiosDistintos}</p>
-              </div>
-              <div className="text-4xl opacity-20">🏘️</div>
-            </div>
-          </div>
-
-          {/* Card 2: Total Pedidos */}
-          <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-green-100 text-sm font-medium mb-1">Total de Pedidos</p>
-                <p className="text-3xl font-bold">{dashboardStats.totalPedidos}</p>
-              </div>
-              <div className="text-4xl opacity-20">📋</div>
-            </div>
-          </div>
-
-          {/* Card 3: Total Equipamentos */}
-          <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-orange-100 text-sm font-medium mb-1">Equipamentos</p>
-                <p className="text-3xl font-bold">{dashboardStats.totalEquipamentos}</p>
-              </div>
-              <div className="text-4xl opacity-20">🚜</div>
-            </div>
-          </div>
-
-          {/* Card 4: Valor Total */}
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-purple-100 text-sm font-medium mb-1">Valor Total</p>
-                <p className="text-2xl font-bold">{formatCurrency(dashboardStats.valorTotal)}</p>
-              </div>
-              <div className="text-4xl opacity-20">💰</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Barra de ações */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6 no-print">
-          <div className="flex flex-col gap-4">
-            {/* Linha 1: Busca e Botões */}
-            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-              <div className="flex-1 max-w-md">
-                <input
-                  type="text"
-                  placeholder="🔍 Buscar por município, liderança, equipamento..."
-                  value={buscaGeral}
-                  onChange={(e) => setBuscaGeral(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium shadow-md"
-                >
-                  🖨️ Imprimir
-                </button>
-                
-                <button
-                  onClick={handleExportExcel}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-md"
-                >
-                  📊 Exportar Excel
-                </button>
-                
-                <button
-                  onClick={() => openModal()}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md"
-                >
-                  + Adicionar Pedido
-                </button>
-              </div>
-            </div>
-
-            {/* Linha 2: Filtros */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="Filtrar por município"
-                value={filtroMunicipio}
-                onChange={(e) => setFiltroMunicipio(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-              />
-              
-              <select
-                value={filtroStatus}
-                onChange={(e) => setFiltroStatus(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Filtrar por status</option>
-                {STATUS_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+        <div className="bg-white rounded-xl shadow p-4 mb-6">
+          <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
+            <input
+              className="w-full md:w-1/2 px-3 py-2 border rounded-lg"
+              placeholder="🔍 Buscar por município, protocolo…"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              list="municipios-cadastrados"
+            />
+            <datalist id="municipios-cadastrados">
+              {lista
+                .slice()
+                .sort((a, b) => norm(a.nome).localeCompare(norm(b.nome)))
+                .map((m) => (
+                  <option key={m.id} value={m.nome} />
                 ))}
-              </select>
+            </datalist>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg"
+              >
+                🖨️ Imprimir
+              </button>
+              <button
+                onClick={exportExcel}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg"
+              >
+                📊 Exportar Excel
+              </button>
+              <button
+                onClick={openCreate}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+              >
+                + Adicionar Município
+              </button>
             </div>
           </div>
-
-          {/* Contador */}
-          <div className="mt-4 text-sm text-gray-600">
-            {pedidosFiltrados.length} {pedidosFiltrados.length === 1 ? 'pedido encontrado' : 'pedidos encontrados'}
-            {(buscaGeral || filtroMunicipio || filtroStatus) && pedidosFiltrados.length < pedidos.length && 
-              ` (de ${pedidos.length} total)`}
+          <div className="text-sm text-gray-600 mt-2">
+            {listaFiltrada.length} de {lista.length} município(s) listados
           </div>
         </div>
 
-        {/* Erro */}
-        {erro && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
-            ⚠️ {erro}
+        {listaFiltrada.length === 0 ? (
+          <div className="bg-white rounded-xl shadow p-12 text-center text-gray-500">
+            Nenhum município cadastrado.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {listaFiltrada.map((m) => {
+              const totBancada = total(m?.bancada?.itensCatalogo);
+              return (
+                <div key={m.id} className="bg-white rounded-xl shadow overflow-hidden">
+                  <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-4 flex justify-between items-start">
+                    <div>
+                      <div className="text-2xl font-bold">{m.nome || "—"}</div>
+                      {m.obs && (
+                        <div className="text-green-100 text-sm mt-1">📝 {m.obs}</div>
+                      )}
+                      {(m?.m37?.protocolo || m?.bancada?.protocolo) && (
+                        <div className="text-green-100 text-xs mt-1">
+                          {m?.m37?.protocolo && (
+                            <span className="mr-3">📄 3.7mi: {m.m37.protocolo}</span>
+                          )}
+                          {m?.bancada?.protocolo && (
+                            <span>📄 Bancada: {m.bancada.protocolo}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-green-100">Valor Global (3.7mi)</div>
+                      <div className="text-2xl font-bold">
+                        {fmtBRL(m?.m37?.valor_global || 0)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 grid md:grid-cols-3 gap-4">
+                    <Info k="Valor SEAB (3.7mi)" v={fmtBRL(m?.m37?.valor_seab || 0)} />
+                    <Info
+                      k="Contrapartida (3.7mi)"
+                      v={fmtBRL(m?.m37?.contrapartida || 0)}
+                    />
+                    <Info k="Itens (Bancada)" v={fmtBRL(totBancada)} />
+
+                    <div className="md:col-span-3 flex items-center justify-end gap-2">
+                      <button
+                        onClick={() =>
+                          setDetalheId((id) => (id === m.id ? null : m.id))
+                        }
+                        className="px-3 py-2 bg-indigo-600 text-white rounded-lg"
+                      >
+                        👁️ Ver detalhes
+                      </button>
+                      <button
+                        onClick={() => openEdit(m)}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-lg"
+                      >
+                        ✏️ Editar
+                      </button>
+                      <button
+                        onClick={() => handleDelete(m.id)}
+                        className="px-3 py-2 bg-red-600 text-white rounded-lg"
+                      >
+                        🗑️ Excluir
+                      </button>
+                    </div>
+                  </div>
+
+                  {detalheId === m.id && (
+                    <div className="px-4 pb-4">
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <DetalhesM37 bloco={m.m37} />
+                        <DetalhesBancada bloco={m.bancada} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {/* Cards de Pedidos */}
-        <div className="space-y-6">
-          {pedidosFiltrados.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-lg p-12 text-center text-gray-500">
-              {buscaGeral || filtroMunicipio || filtroStatus
-                ? '🔍 Nenhum pedido encontrado com esses critérios'
-                : '🚜 Nenhum pedido cadastrado ainda'}
-            </div>
-          ) : (
-            pedidosFiltrados.map((pedido) => (
-              <div key={pedido.id} className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
-                {/* Header do Card */}
-                <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-6">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-2xl font-bold">{pedido.municipio_nome || 'Município não informado'}</h3>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          pedido.status === 'atendido' ? 'bg-green-200 text-green-900' :
-                          pedido.status === 'em_andamento' ? 'bg-blue-200 text-blue-900' :
-                          pedido.status === 'aguardando_atendimento' ? 'bg-yellow-200 text-yellow-900' :
-                          pedido.status === 'arquivado' ? 'bg-gray-200 text-gray-900' :
-                          'bg-white/20'
-                        }`}>
-                          {formatStatus(pedido.status)}
-                        </span>
-                      </div>
-                      {pedido.lideranca_nome && (
-                        <p className="text-green-100 text-sm">
-                          👤 Liderança: <span className="font-medium">{pedido.lideranca_nome}</span>
-                        </p>
-                      )}
-                      <p className="text-green-100 text-xs mt-1">
-                        📅 Criado em: {new Date(pedido.created_at).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                    
-                    <div className="text-right">
-                      <p className="text-green-100 text-sm mb-1">Valor Total</p>
-                      <p className="text-3xl font-bold">{formatCurrency(pedido.valor_total)}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Corpo do Card - Equipamentos */}
-                <div className="p-6">
-                  <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <span>🚜</span>
-                    <span>Equipamentos Solicitados ({pedido.itens?.length || 0})</span>
-                  </h4>
-                  
-                  {pedido.itens && pedido.itens.length > 0 ? (
-                    <div className="space-y-3">
-                      {pedido.itens.map((item, idx) => (
-                        <div key={idx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <h5 className="font-semibold text-gray-900 mb-1">
-                                {item.equipamento || 'Equipamento não especificado'}
-                              </h5>
-                              {item.observacao && (
-                                <p className="text-sm text-gray-600 mt-1">
-                                  📝 {item.observacao}
-                                </p>
-                              )}
-                            </div>
-                            <div className="text-right ml-4">
-                              <div className="text-sm text-gray-600">
-                                <span className="font-medium">Qtd:</span> {item.quantidade || 0}
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                <span className="font-medium">Unit:</span> {formatCurrency(item.preco_unitario || 0)}
-                              </div>
-                              <div className="text-lg font-bold text-green-700 mt-1">
-                                {formatCurrency(item.subtotal || 0)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 text-center py-4">Nenhum equipamento adicionado</p>
-                  )}
-                </div>
-
-                {/* Footer do Card - Ações */}
-                <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 no-print">
-                  <button
-                    onClick={() => openModal(pedido)}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
-                  >
-                    ✏️ Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(pedido.id)}
-                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
-                  >
-                    🗑️ Excluir
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <h2 className="text-2xl font-bold mb-6 text-gray-900">
-                {editingId ? 'Editar Pedido' : 'Adicionar Pedido'}
-              </h2>
-
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Município */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Município <span className="text-red-500">*</span>
-                  </label>
-                  <MunicipioSelect
-                    value={formData.municipio_id}
-                    onChange={(value, municipio) => {
-                      setFormData({
-                        ...formData,
-                        municipio_id: value,
-                        municipio_nome: municipio ? municipio.nome : ''
-                      });
-                    }}
-                    placeholder="Digite para buscar município..."
-                    required
-                  />
-                </div>
-
-                {/* Liderança (opcional) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Liderança Responsável (opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.lideranca_nome}
-                    onChange={(e) => setFormData({ ...formData, lideranca_nome: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                    placeholder="Ex: João da Silva"
-                  />
-                </div>
-
-                {/* Status */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Status (opcional)
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="">Selecione um status</option>
-                    {STATUS_OPTIONS.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Seção de Itens */}
-                <div className="border-t pt-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Itens do Pedido <span className="text-red-500">*</span>
-                    </h3>
+        {/* MODAL */}
+        {showModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+              <form onSubmit={handleSave}>
+                <div className="p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-bold">
+                      {editingId ? "Editar Município" : "Adicionar Município"}
+                    </h2>
                     <button
                       type="button"
-                      onClick={handleAddItem}
-                      className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
+                      onClick={() => setShowModal(false)}
+                      className="text-gray-500 hover:text-gray-700"
                     >
-                      + Adicionar Item
+                      ✖
                     </button>
                   </div>
 
-                  {formData.itens.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
-                      Nenhum item adicionado. Clique em "Adicionar Item" para começar.
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* ======= AUTOCOMPLETE NOVO ======= */}
+                    <AutocompleteMunicipio
+                      value={form.nome}
+                      onChange={(nome) => setForm((p) => ({ ...p, nome }))}
+                      onBlurCanonicalize={(nome) =>
+                        setForm((p) => ({ ...p, nome: canonicalizeNome(nome) }))
+                      }
+                      options={municipiosPR}
+                    />
+                    <div>
+                      <label className="block text-sm text-gray-700 mb-1">
+                        Observação (opcional)
+                      </label>
+                      <input
+                        className="w-full border rounded-lg px-3 py-2"
+                        value={form.obs}
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, obs: e.target.value }))
+                        }
+                        placeholder="Notas internas…"
+                      />
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {formData.itens.map((item, index) => (
-                        <div key={index} className="border rounded-lg p-4 bg-gray-50 relative">
-                          {/* Botão remover */}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(index)}
-                            className="absolute top-2 right-2 text-red-500 hover:text-red-700"
-                            title="Remover item"
-                          >
-                            ❌
-                          </button>
+                  </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Equipamento */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Equipamento <span className="text-red-500">*</span>
-                              </label>
-                              <select
-                                value={item.equipamento}
-                                onChange={(e) => handleUpdateItem(index, 'equipamento', e.target.value)}
-                                required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
-                              >
-                                <option value="">Selecione um equipamento</option>
-                                {catalogoEquipamentos.map(eq => (
-                                  <option key={eq.nome} value={eq.nome}>
-                                    {eq.nome} - {formatCurrency(eq.preco)}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
+                  {/* 3.7mi */}
+                  <section className="border-t pt-4">
+                    <h3 className="text-lg font-semibold mb-3">Maquinários de 3.7mi</h3>
 
-                            {/* Quantidade */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Quantidade <span className="text-red-500">*</span>
-                              </label>
-                              <input
-                                type="number"
-                                min="1"
-                                value={item.quantidade}
-                                onChange={(e) => handleUpdateItem(index, 'quantidade', e.target.value)}
-                                required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
-                              />
-                            </div>
-
-                            {/* Preço Unitário (read-only) */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Preço Unitário (automático)
-                              </label>
-                              <input
-                                type="text"
-                                value={formatCurrency(item.preco_unitario)}
-                                readOnly
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm text-gray-600"
-                              />
-                            </div>
-
-                            {/* Subtotal (calculado) */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Subtotal (automático)
-                              </label>
-                              <input
-                                type="text"
-                                value={formatCurrency(item.subtotal)}
-                                readOnly
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-green-50 text-sm font-semibold text-green-700"
-                              />
-                            </div>
-
-                            {/* Observação */}
-                            <div className="md:col-span-2">
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Observação (opcional)
-                              </label>
-                              <input
-                                type="text"
-                                value={item.observacao}
-                                onChange={(e) => handleUpdateItem(index, 'observacao', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
-                                placeholder="Ex: Com pneus novos"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Total do Pedido */}
-                  {formData.itens.length > 0 && (
-                    <div className="mt-6 pt-4 border-t">
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-semibold text-gray-900">
-                          Total do Pedido:
-                        </span>
-                        <span className="text-2xl font-bold text-green-700">
-                          {formatCurrency(formData.valor_total)}
-                        </span>
+                    <div className="grid md:grid-cols-4 gap-4 mb-3">
+                      <div>
+                        <label className="block text-sm text-gray-700 mb-1">
+                          Protocolo (opcional)
+                        </label>
+                        <input
+                          className="w-full border rounded-lg px-3 py-2"
+                          value={form.m37.protocolo}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              m37: { ...p.m37, protocolo: e.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-700 mb-1">
+                          Valor Global
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          className="w-full border rounded-lg px-3 py-2"
+                          value={fmtBRL(form.m37.valor_global || 0)}
+                          onChange={setM37Money("valor_global")}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-700 mb-1">
+                          Valor SEAB
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          className="w-full border rounded-lg px-3 py-2"
+                          value={fmtBRL(form.m37.valor_seab || 0)}
+                          onChange={setM37Money("valor_seab")}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-700 mb-1">
+                          Contrapartida
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          className="w-full border rounded-lg px-3 py-2"
+                          value={fmtBRL(form.m37.contrapartida || 0)}
+                          onChange={setM37Money("contrapartida")}
+                        />
                       </div>
                     </div>
-                  )}
+
+                    <EditorM37
+                      itens={form.m37.itensManuais}
+                      addItem={addItemM37}
+                      rmItem={rmItemM37}
+                      updItem={updItemM37}
+                    />
+                  </section>
+
+                  {/* Bancada */}
+                  <section className="border-t pt-4">
+                    <h3 className="text-lg font-semibold mb-3">Emenda de Bancada</h3>
+
+                    <div className="grid md:grid-cols-4 gap-4 mb-3">
+                      <div>
+                        <label className="block text-sm text-gray-700 mb-1">
+                          Protocolo (opcional)
+                        </label>
+                        <input
+                          className="w-full border rounded-lg px-3 py-2"
+                          value={form.bancada.protocolo}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              bancada: { ...p.bancada, protocolo: e.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <EditorBancada
+                      itens={form.bancada.itensCatalogo}
+                      addItem={addItemBancada}
+                      rmItem={rmItemBancada}
+                      updItem={updItemBancada}
+                      catalogo={catalogo}
+                    />
+                  </section>
                 </div>
 
-                {/* Botões */}
-                <div className="flex gap-3 justify-end mt-6 pt-6 border-t">
+                <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2">
                   <button
                     type="button"
-                    onClick={closeModal}
-                    disabled={submitting}
-                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    onClick={() => setShowModal(false)}
+                    className="px-4 py-2 border rounded-lg"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    disabled={submitting}
-                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                    disabled={salvando}
+                    className="px-5 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
                   >
-                    {submitting ? 'Salvando...' : (editingId ? 'Atualizar' : 'Criar')}
+                    {salvando ? "Salvando…" : editingId ? "Atualizar" : "Salvar"}
                   </button>
                 </div>
               </form>
             </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---- Subcomponentes compartilhados ---- */
+function Info({ k, v }) {
+  return (
+    <div className="bg-gray-50 border rounded-lg p-3">
+      <div className="text-xs text-gray-500 mb-1">{k}</div>
+      <div className="text-lg font-semibold">{v}</div>
+    </div>
+  );
+}
+function EditorM37({ itens, addItem, rmItem, updItem }) {
+  const total = (itens || []).reduce((s, i) => s + Number(i.subtotal || 0), 0);
+  return (
+    <div className="bg-gray-50 rounded-lg p-3 border">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-sm text-gray-600">
+          Itens (manuais) • Total:{" "}
+          <span className="font-semibold">
+            {new Intl.NumberFormat("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            }).format(total)}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={addItem}
+          className="px-3 py-2 bg-green-600 text-white rounded-lg"
+        >
+          + Adicionar Item
+        </button>
+      </div>
+
+      {(!itens || itens.length === 0) ? (
+        <div className="text-center text-gray-500 py-6">Nenhum item adicionado.</div>
+      ) : (
+        <div className="space-y-3">
+          {itens.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white rounded-lg border p-3 grid md:grid-cols-4 gap-3 relative"
+            >
+              <button
+                type="button"
+                onClick={() => rmItem(idx)}
+                className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-7 h-7"
+                title="Remover"
+              >
+                ×
+              </button>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm text-gray-700 mb-1">
+                  Descrição do item
+                </label>
+                <input
+                  className="w-full border rounded-lg px-3 py-2"
+                  value={item.descricao}
+                  onChange={(e) => updItem(idx, "descricao", e.target.value)}
+                  placeholder="Ex.: Trator agrícola 110cv"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">
+                  Quantidade
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={item.quantidade || 1}
+                  onChange={(e) => updItem(idx, "quantidade", e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">
+                  Preço unitário
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={fmtBRL(item.preco_unitario || 0)}
+                  onChange={(e) =>
+                    updItem(idx, "preco_unitario", toNumberBRL(e.target.value))
+                  }
+                  className="w-full border rounded-lg px-3 py-2"
+                />
+              </div>
+
+              <div className="md:col-span-4">
+                <label className="block text-sm text-gray-700 mb-1">
+                  Observação (opcional)
+                </label>
+                <input
+                  value={item.observacao || ""}
+                  onChange={(e) => updItem(idx, "observacao", e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2"
+                  placeholder="Ex.: item a diesel"
+                />
+              </div>
+
+              <div className="md:col-span-4 text-right text-sm">
+                Subtotal:{" "}
+                <span className="font-semibold">
+                  {fmtBRL(item.subtotal || 0)}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+function EditorBancada({ itens, addItem, rmItem, updItem, catalogo }) {
+  const total = (itens || []).reduce((s, i) => s + Number(i.subtotal || 0), 0);
+  return (
+    <div className="bg-gray-50 rounded-lg p-3 border">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-sm text-gray-600">
+          Itens do Catálogo • Total:{" "}
+          <span className="font-semibold">{fmtBRL(total)}</span>
+        </div>
+        <button
+          type="button"
+          onClick={addItem}
+          className="px-3 py-2 bg-green-600 text-white rounded-lg"
+        >
+          + Adicionar Item
+        </button>
+      </div>
+
+      {(!itens || itens.length === 0) ? (
+        <div className="text-center text-gray-500 py-6">Nenhum item adicionado.</div>
+      ) : (
+        <div className="space-y-3">
+          {itens.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white rounded-lg border p-3 grid md:grid-cols-4 gap-3 relative"
+            >
+              <button
+                type="button"
+                onClick={() => rmItem(idx)}
+                className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-7 h-7"
+                title="Remover"
+              >
+                ×
+              </button>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm text-gray-700 mb-1">
+                  Equipamento
+                </label>
+                <select
+                  className="w-full border rounded-lg px-3 py-2"
+                  value={item.equipamento}
+                  onChange={(e) => updItem(idx, "equipamento", e.target.value)}
+                >
+                  <option value="">Selecione…</option>
+                  {catalogo.map((c) => (
+                    <option key={c.nome} value={c.nome}>
+                      {c.nome} — {fmtBRL(c.preco)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">
+                  Quantidade
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={item.quantidade || 1}
+                  onChange={(e) => updItem(idx, "quantidade", e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">
+                  Subtotal (auto)
+                </label>
+                <input
+                  readOnly
+                  value={fmtBRL(item.subtotal || 0)}
+                  className="w-full border rounded-lg px-3 py-2 bg-green-50 font-semibold"
+                />
+              </div>
+
+              <div className="md:col-span-4">
+                <label className="block text-sm text-gray-700 mb-1">
+                  Observação (opcional)
+                </label>
+                <input
+                  value={item.observacao || ""}
+                  onChange={(e) => updItem(idx, "observacao", e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2"
+                  placeholder="Ex.: com pneus novos"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+function DetalhesM37({ bloco }) {
+  const totalItens = (bloco?.itensManuais || []).reduce(
+    (s, i) => s + Number(i.subtotal || 0),
+    0
+  );
+  return (
+    <div className="bg-white rounded-lg border shadow p-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-lg font-semibold">Maquinários de 3.7mi</h4>
+        <div className="text-right text-sm">
+          {bloco?.protocolo && <div>📄 Protocolo: {bloco.protocolo}</div>}
+          <div>Valor Global: {fmtBRL(bloco?.valor_global || 0)}</div>
+          <div>Valor SEAB: {fmtBRL(bloco?.valor_seab || 0)}</div>
+          <div>Contrapartida: {fmtBRL(bloco?.contrapartida || 0)}</div>
+        </div>
+      </div>
+      {(bloco?.itensManuais || []).length === 0 ? (
+        <div className="text-gray-500 text-sm mt-3">Sem itens.</div>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {bloco.itensManuais.map((i, idx) => (
+            <div
+              key={idx}
+              className="border rounded-lg p-3 bg-gray-50 flex items-center justify-between"
+            >
+              <div>
+                <div className="font-medium">{i.descricao || "-"}</div>
+                {i.observacao && (
+                  <div className="text-xs text-gray-600">📝 {i.observacao}</div>
+                )}
+              </div>
+              <div className="text-right text-sm">
+                <div>Qtd: {i.quantidade || 0}</div>
+                <div>Unit: {fmtBRL(i.preco_unitario || 0)}</div>
+                <div className="font-semibold">{fmtBRL(i.subtotal || 0)}</div>
+              </div>
+            </div>
+          ))}
+          <div className="text-right text-sm">
+            Total dos itens: <span className="font-bold">{fmtBRL(totalItens)}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function DetalhesBancada({ bloco }) {
+  const totalItens = (bloco?.itensCatalogo || []).reduce(
+    (s, i) => s + Number(i.subtotal || 0),
+    0
+  );
+  return (
+    <div className="bg-white rounded-lg border shadow p-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-lg font-semibold">Emenda de Bancada</h4>
+        <div className="text-right text-sm">
+          {bloco?.protocolo && <div>📄 Protocolo: {bloco.protocolo}</div>}
+        </div>
+      </div>
+      {(bloco?.itensCatalogo || []).length === 0 ? (
+        <div className="text-gray-500 text-sm mt-3">Sem itens.</div>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {bloco.itensCatalogo.map((i, idx) => (
+            <div
+              key={idx}
+              className="border rounded-lg p-3 bg-gray-50 flex items-center justify-between"
+            >
+              <div>
+                <div className="font-medium">{i.equipamento}</div>
+                {i.observacao && (
+                  <div className="text-xs text-gray-600">📝 {i.observacao}</div>
+                )}
+              </div>
+              <div className="text-right text-sm">
+                <div>Qtd: {i.quantidade || 0}</div>
+                <div>Unit: {fmtBRL(i.preco_unitario || 0)}</div>
+                <div className="font-semibold">{fmtBRL(i.subtotal || 0)}</div>
+              </div>
+            </div>
+          ))}
+          <div className="text-right text-sm">
+            Total dos itens: <span className="font-bold">{fmtBRL(totalItens)}</span>
           </div>
         </div>
       )}
